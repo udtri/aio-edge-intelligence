@@ -1,0 +1,150 @@
+# =============================================================================
+# Helm Values — aio-sensor-intelligence
+# =============================================================================
+# Default configuration values for the aio-sensor-intelligence Helm chart.
+# Override these values using --set flags or a custom values file:
+#
+#   helm install my-release ./aio-sensor-intelligence \
+#     --set inferenceServer.resources.limits.gpu=1 \
+#     --set model.device=cuda \
+#     -f my-custom-values.yaml
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Inference Server Configuration
+# ---------------------------------------------------------------------------
+inferenceServer:
+  # Container image settings
+  image:
+    repository: aio-sensor-intelligence/inference-server
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+
+  # Number of inference server replicas (typically 1 for edge deployments)
+  replicas: 1
+
+  # Resource requests and limits
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: "1"
+      memory: 2Gi
+      # Set to "1" to request an NVIDIA GPU for accelerated inference.
+      # Requires the NVIDIA device plugin to be installed on the cluster.
+      gpu: ""
+
+  # Service configuration
+  service:
+    type: ClusterIP
+    port: 8080
+
+  # Health check settings (seconds)
+  probes:
+    readiness:
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+    liveness:
+      initialDelaySeconds: 60
+      periodSeconds: 30
+      timeoutSeconds: 10
+      failureThreshold: 5
+
+# ---------------------------------------------------------------------------
+# Sensor Simulator Configuration
+# ---------------------------------------------------------------------------
+sensorSimulator:
+  # Set to false to disable the simulator (e.g., when using real OPC UA data)
+  enabled: true
+
+  # Container image settings
+  image:
+    repository: aio-sensor-intelligence/sensor-simulator
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+
+  # Resource requests and limits — simulator is lightweight
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+  # Interval (in seconds) between simulated sensor readings
+  publishInterval: "1.0"
+
+# ---------------------------------------------------------------------------
+# MQTT Broker Configuration
+# ---------------------------------------------------------------------------
+mqtt:
+  # In AIO-connected mode, this should point to the AIO MQTT broker.
+  # The AIO broker typically runs as "aio-broker" in the cluster.
+  broker:
+    host: "aio-broker"
+    port: 18883
+
+  # Enable TLS for the MQTT connection (recommended for AIO broker)
+  useTLS: true
+
+  # MQTT topics for sensor data ingestion
+  topics:
+    sensors:
+      - "sensors/temperature"
+      - "sensors/vibration"
+      - "sensors/pressure"
+    # Topics where AI results are published
+    aiResults: "ai/results"
+    anomalyScores: "ai/anomaly-scores"
+    forecasts: "ai/forecasts"
+
+# ---------------------------------------------------------------------------
+# Model Configuration
+# ---------------------------------------------------------------------------
+model:
+  # Model provider framework ("moment" for MOMENT foundation model)
+  provider: "moment"
+  # Hugging Face model identifier or local model path
+  name: "AutonLab/MOMENT-1-large"
+  # Compute device: "auto" (detect GPU/CPU), "cpu", or "cuda"
+  device: "auto"
+  # Number of data points in each inference window
+  windowSize: "512"
+  # Default AI task to perform on incoming data:
+  #   anomaly_detection | forecasting | classification | imputation
+  defaultTask: "anomaly_detection"
+
+# ---------------------------------------------------------------------------
+# Grafana Dashboard (Optional)
+# ---------------------------------------------------------------------------
+grafana:
+  # Set to true to deploy a Grafana dashboard for visualizing AI results
+  enabled: false
+  # If Grafana is already deployed, provide the service name to configure
+  # the dashboard automatically via a ConfigMap sidecar.
+  # serviceName: "grafana"
+
+# ---------------------------------------------------------------------------
+# Image Pull Secrets
+# ---------------------------------------------------------------------------
+# Specify secrets for pulling images from private container registries
+imagePullSecrets: []
+# - name: my-registry-secret
+
+# ---------------------------------------------------------------------------
+# Pod-level Overrides
+# ---------------------------------------------------------------------------
+# Additional labels to add to all resources
+commonLabels: {}
+# Additional annotations to add to all resources
+commonAnnotations: {}
+# Node selector for pod scheduling
+nodeSelector: {}
+# Tolerations for pod scheduling
+tolerations: []
+# Affinity rules for pod scheduling
+affinity: {}

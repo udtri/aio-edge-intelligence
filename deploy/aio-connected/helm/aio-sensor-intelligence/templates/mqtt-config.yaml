@@ -1,0 +1,45 @@
+{{/*
+=============================================================================
+ConfigMap — MQTT and Model Configuration
+=============================================================================
+Centralizes all MQTT broker settings and AI model configuration used by
+both the inference server and sensor simulator.
+=============================================================================
+*/}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "aio-sensor-intelligence.fullname" . }}-config
+  labels:
+    app.kubernetes.io/name: {{ include "aio-sensor-intelligence.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/part-of: aio-sensor-intelligence
+    helm.sh/chart: {{ include "aio-sensor-intelligence.chart" . }}
+data:
+  # ---------------------------------------------------------------------------
+  # Model Configuration
+  # ---------------------------------------------------------------------------
+  MODEL_PROVIDER: {{ .Values.model.provider | quote }}
+  MODEL_NAME: {{ .Values.model.name | quote }}
+  DEVICE: {{ .Values.model.device | quote }}
+  WINDOW_SIZE: {{ .Values.model.windowSize | quote }}
+  DEFAULT_TASK: {{ .Values.model.defaultTask | quote }}
+
+  # ---------------------------------------------------------------------------
+  # MQTT Broker Configuration
+  # ---------------------------------------------------------------------------
+  MQTT_BROKER_HOST: {{ .Values.mqtt.broker.host | quote }}
+  MQTT_BROKER_PORT: {{ .Values.mqtt.broker.port | quote }}
+  MQTT_USE_TLS: {{ .Values.mqtt.useTLS | quote }}
+
+  # ---------------------------------------------------------------------------
+  # Sensor Topics
+  # ---------------------------------------------------------------------------
+  SENSOR_TOPICS: {{ join "," .Values.mqtt.topics.sensors | quote }}
+
+  # ---------------------------------------------------------------------------
+  # AI Output Topics
+  # ---------------------------------------------------------------------------
+  AI_RESULTS_TOPIC: {{ .Values.mqtt.topics.aiResults | quote }}
+  AI_ANOMALY_SCORES_TOPIC: {{ .Values.mqtt.topics.anomalyScores | quote }}
+  AI_FORECASTS_TOPIC: {{ .Values.mqtt.topics.forecasts | quote }}

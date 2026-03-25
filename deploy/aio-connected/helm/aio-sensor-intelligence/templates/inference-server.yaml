@@ -1,0 +1,135 @@
+{{/*
+=============================================================================
+Inference Server — Deployment + Service
+=============================================================================
+Deploys the time-series AI inference server that hosts foundation models
+(e.g., MOMENT) for real-time anomaly detection, forecasting, and more.
+=============================================================================
+*/}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "aio-sensor-intelligence.fullname" . }}-inference-server
+  labels:
+    app.kubernetes.io/name: {{ include "aio-sensor-intelligence.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: ai-inference
+    app.kubernetes.io/part-of: aio-sensor-intelligence
+    helm.sh/chart: {{ include "aio-sensor-intelligence.chart" . }}
+    {{- with .Values.commonLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.commonAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  replicas: {{ .Values.inferenceServer.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "aio-sensor-intelligence.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: ai-inference
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "aio-sensor-intelligence.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: ai-inference
+        {{- with .Values.commonLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        # Force pod restart when ConfigMap changes
+        checksum/config: {{ include (print $.Template.BasePath "/mqtt-config.yaml") . | sha256sum }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: inference-server
+          image: "{{ .Values.inferenceServer.image.repository }}:{{ .Values.inferenceServer.image.tag }}"
+          imagePullPolicy: {{ .Values.inferenceServer.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          # -------------------------------------------------------------------
+          # Environment variables from the shared ConfigMap
+          # -------------------------------------------------------------------
+          envFrom:
+            - configMapRef:
+                name: {{ include "aio-sensor-intelligence.fullname" . }}-config
+          # -------------------------------------------------------------------
+          # Resource limits — adjust based on model size and workload
+          # -------------------------------------------------------------------
+          resources:
+            requests:
+              cpu: {{ .Values.inferenceServer.resources.requests.cpu }}
+              memory: {{ .Values.inferenceServer.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.inferenceServer.resources.limits.cpu | quote }}
+              memory: {{ .Values.inferenceServer.resources.limits.memory }}
+              {{- if .Values.inferenceServer.resources.limits.gpu }}
+              # NVIDIA GPU scheduling — requires the NVIDIA device plugin
+              nvidia.com/gpu: {{ .Values.inferenceServer.resources.limits.gpu | quote }}
+              {{- end }}
+          # -------------------------------------------------------------------
+          # Health probes
+          # -------------------------------------------------------------------
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: {{ .Values.inferenceServer.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.inferenceServer.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.inferenceServer.probes.readiness.timeoutSeconds }}
+            failureThreshold: {{ .Values.inferenceServer.probes.readiness.failureThreshold }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: {{ .Values.inferenceServer.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.inferenceServer.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.inferenceServer.probes.liveness.timeoutSeconds }}
+            failureThreshold: {{ .Values.inferenceServer.probes.liveness.failureThreshold }}
+      terminationGracePeriodSeconds: 30
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+---
+# ---------------------------------------------------------------------------
+# Service — Inference Server
+# ---------------------------------------------------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "aio-sensor-intelligence.fullname" . }}-inference-server
+  labels:
+    app.kubernetes.io/name: {{ include "aio-sensor-intelligence.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: ai-inference
+    app.kubernetes.io/part-of: aio-sensor-intelligence
+    helm.sh/chart: {{ include "aio-sensor-intelligence.chart" . }}
+spec:
+  type: {{ .Values.inferenceServer.service.type }}
+  selector:
+    app.kubernetes.io/name: {{ include "aio-sensor-intelligence.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: ai-inference
+  ports:
+    - name: http
+      port: {{ .Values.inferenceServer.service.port }}
+      targetPort: http
+      protocol: TCP

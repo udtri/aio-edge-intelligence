@@ -1,0 +1,85 @@
+{{/*
+=============================================================================
+Sensor Simulator — Deployment (Conditionally Enabled)
+=============================================================================
+Generates synthetic time-series sensor data for testing and demos. Disable
+this when using real OPC UA sensor data via the AIO connector by setting
+sensorSimulator.enabled=false in your values file.
+=============================================================================
+*/}}
+{{- if .Values.sensorSimulator.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "aio-sensor-intelligence.fullname" . }}-sensor-simulator
+  labels:
+    app.kubernetes.io/name: {{ include "aio-sensor-intelligence.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: data-generator
+    app.kubernetes.io/part-of: aio-sensor-intelligence
+    helm.sh/chart: {{ include "aio-sensor-intelligence.chart" . }}
+    {{- with .Values.commonLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.commonAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "aio-sensor-intelligence.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: data-generator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "aio-sensor-intelligence.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: data-generator
+        {{- with .Values.commonLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        # Force pod restart when ConfigMap changes
+        checksum/config: {{ include (print $.Template.BasePath "/mqtt-config.yaml") . | sha256sum }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: sensor-simulator
+          image: "{{ .Values.sensorSimulator.image.repository }}:{{ .Values.sensorSimulator.image.tag }}"
+          imagePullPolicy: {{ .Values.sensorSimulator.image.pullPolicy }}
+          # -------------------------------------------------------------------
+          # Environment variables from the shared ConfigMap
+          # -------------------------------------------------------------------
+          envFrom:
+            - configMapRef:
+                name: {{ include "aio-sensor-intelligence.fullname" . }}-config
+          # Additional simulator-specific env vars
+          env:
+            - name: PUBLISH_INTERVAL
+              value: {{ .Values.sensorSimulator.publishInterval | quote }}
+          # -------------------------------------------------------------------
+          # Resource limits — simulator is lightweight
+          # -------------------------------------------------------------------
+          resources:
+            requests:
+              cpu: {{ .Values.sensorSimulator.resources.requests.cpu }}
+              memory: {{ .Values.sensorSimulator.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.sensorSimulator.resources.limits.cpu }}
+              memory: {{ .Values.sensorSimulator.resources.limits.memory }}
+      terminationGracePeriodSeconds: 5
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

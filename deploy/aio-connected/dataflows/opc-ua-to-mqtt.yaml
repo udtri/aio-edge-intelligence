@@ -1,0 +1,118 @@
+# =============================================================================
+# AIO Dataflow — OPC UA to MQTT
+# =============================================================================
+# This dataflow ingests data from an OPC UA server (via the AIO OPC UA
+# connector) and routes it to MQTT broker topics in a normalized sensor
+# schema that the inference server can consume.
+#
+# Prerequisites:
+#   1. Azure IoT Operations is installed on the cluster
+#   2. The OPC UA connector is configured with your OPC UA server endpoint
+#   3. The AIO MQTT broker is running
+#
+# Customization:
+#   - Update the sourceEndpoint to match your OPC UA connector asset name
+#   - Modify the transformation to match your OPC UA node structure
+#   - Add or remove destination topics based on your sensor types
+#
+# Apply:
+#   kubectl apply -f opc-ua-to-mqtt.yaml
+# =============================================================================
+
+---
+# ---------------------------------------------------------------------------
+# DataflowProfile — Defines processing resources for the dataflow
+# ---------------------------------------------------------------------------
+apiVersion: connectivity.iotoperations.azure.com/v1
+kind: DataflowProfile
+metadata:
+  name: sensor-intelligence-profile
+  namespace: azure-iot-operations
+spec:
+  # Number of dataflow instances for parallel processing
+  instanceCount: 1
+
+---
+# ---------------------------------------------------------------------------
+# Dataflow — OPC UA Sensor Data to MQTT Topics
+# ---------------------------------------------------------------------------
+# Routes OPC UA telemetry from industrial sensors to MQTT topics in a
+# standardized format for the AI inference server.
+apiVersion: connectivity.iotoperations.azure.com/v1
+kind: Dataflow
+metadata:
+  name: opc-ua-to-mqtt
+  namespace: azure-iot-operations
+spec:
+  profileRef: sensor-intelligence-profile
+  mode: Enabled
+
+  operations:
+    # -----------------------------------------------------------------
+    # Source: OPC UA Connector
+    # -----------------------------------------------------------------
+    # Reads telemetry from the AIO OPC UA connector. The connector
+    # translates OPC UA node values into MQTT messages.
+    #
+    # To customize for your OPC UA server:
+    #   1. Create an AssetEndpointProfile for your OPC UA server
+    #   2. Create Asset resources for the nodes you want to monitor
+    #   3. Update the dataSourceRef below to match your asset name
+    - operationType: Source
+      sourceSettings:
+        # Reference to the AIO OPC UA connector endpoint.
+        # Replace "opc-ua-connector" with your configured endpoint name.
+        endpointRef: opc-ua-connector
+        dataSources:
+          # OPC UA node paths — customize these for your server's namespace.
+          #
+          # Example OPC UA nodes for industrial equipment:
+          #   - ns=2;s=Machine1/Temperature
+          #   - ns=2;s=Machine1/Vibration
+          #   - ns=2;s=Machine1/Pressure
+          #
+          # The wildcard pattern below captures all nodes under the
+          # "Sensors" folder. Adjust to match your OPC UA address space.
+          - "ns=2;s=Sensors/#"
+
+    # -----------------------------------------------------------------
+    # Transformation: Normalize to Standard Sensor Schema
+    # -----------------------------------------------------------------
+    # Converts raw OPC UA telemetry into the standard schema expected
+    # by the inference server:
+    #
+    #   {
+    #     "timestamp": "2024-01-01T00:00:00Z",
+    #     "sensor_id": "temperature-01",
+    #     "value": 72.5,
+    #     "unit": "celsius",
+    #     "quality": "good"
+    #   }
+    #
+    # Modify the mapping expressions below to match the structure of
+    # your OPC UA data.
+    - operationType: BuiltInTransformation
+      builtInTransformationSettings:
+        datasets:
+          - key: sensor-data
+            inputs:
+              # Map OPC UA SourceTimestamp to our standard timestamp field
+              - "*"
+            expression: >-
+              {
+                "timestamp": .SourceTimestamp,
+                "sensor_id": .Tag,
+                "value": .Value,
+                "quality": (if .StatusCode.Symbol == "Good" then "good" else "bad" end)
+              }
+
+    # -----------------------------------------------------------------
+    # Destination: MQTT Broker Topics
+    # -----------------------------------------------------------------
+    # Publishes the normalized sensor data to the AIO MQTT broker.
+    # The inference server subscribes to these topics.
+    - operationType: Destination
+      destinationSettings:
+        # Reference to the AIO MQTT broker endpoint
+        endpointRef: aio-broker
+        dataDestination: "sensors/{.sensor_id}"

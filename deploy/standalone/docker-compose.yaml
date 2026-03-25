@@ -1,0 +1,98 @@
+# =============================================================================
+# Standalone Docker Compose Deployment
+# =============================================================================
+# This configuration runs the full aio-sensor-intelligence stack locally
+# without requiring Azure IoT Operations. Ideal for development and testing.
+#
+# Usage:
+#   docker compose up --build
+#   docker compose down -v
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # MQTT Broker — Eclipse Mosquitto
+  # ---------------------------------------------------------------------------
+  # Lightweight MQTT broker for local message routing between the sensor
+  # simulator and inference server.
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: mosquitto
+    ports:
+      - "1883:1883"
+    volumes:
+      - mosquitto-config:/mosquitto/config
+      - mosquitto-data:/mosquitto/data
+    # Enable anonymous access for local development (no auth required)
+    command: mosquitto -c /dev/null -p 1883 -v
+    environment:
+      - MOSQUITTO_USERNAME=
+      - MOSQUITTO_PASSWORD=
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_sub -t '$$SYS/#' -C 1 -W 3 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Inference Server — Time-Series AI Model Host
+  # ---------------------------------------------------------------------------
+  # Runs the MOMENT (or other) time-series foundation model. Subscribes to
+  # sensor data topics and publishes AI results (anomalies, forecasts, etc.).
+  inference-server:
+    build:
+      context: ../../src/inference-server
+      dockerfile: Dockerfile
+    container_name: inference-server
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    environment:
+      # MQTT connection settings — points to the local Mosquitto broker
+      - MQTT_BROKER_HOST=mosquitto
+      - MQTT_BROKER_PORT=1883
+      # Model configuration
+      - MODEL_PROVIDER=moment
+      - MODEL_NAME=AutonLab/MOMENT-1-large
+      - DEVICE=cpu
+      - WINDOW_SIZE=512
+      - DEFAULT_TASK=anomaly_detection
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Sensor Simulator — Synthetic Data Generator
+  # ---------------------------------------------------------------------------
+  # Generates realistic time-series sensor data and publishes to MQTT topics.
+  # Used for testing and demonstration when real OPC UA devices are unavailable.
+  sensor-simulator:
+    build:
+      context: ../../src/sensor-simulator
+      dockerfile: Dockerfile
+    container_name: sensor-simulator
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+      inference-server:
+        condition: service_started
+    environment:
+      # MQTT connection settings — points to the local Mosquitto broker
+      - MQTT_BROKER_HOST=mosquitto
+      - MQTT_BROKER_PORT=1883
+      # Sensor simulation settings
+      - PUBLISH_INTERVAL=1.0
+      - SENSOR_TOPICS=sensors/temperature,sensors/vibration,sensors/pressure
+    restart: unless-stopped
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  # Persistent storage for Mosquitto configuration
+  mosquitto-config:
+    driver: local
+  # Persistent storage for Mosquitto message data
+  mosquitto-data:
+    driver: local

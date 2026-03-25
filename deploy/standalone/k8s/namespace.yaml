@@ -1,0 +1,15 @@
+# =============================================================================
+# Namespace — aio-sensor-intelligence
+# =============================================================================
+# Isolates all project resources in a dedicated Kubernetes namespace.
+#
+# Apply first:
+#   kubectl apply -f namespace.yaml
+# =============================================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: aio-sensor-intelligence
+  labels:
+    app.kubernetes.io/name: aio-sensor-intelligence
+    app.kubernetes.io/part-of: aio-sensor-intelligence

@@ -1,0 +1,112 @@
+# =============================================================================
+# AIO Dataflow — AI Results to Azure Event Hub
+# =============================================================================
+# This dataflow routes AI inference results from the local MQTT broker to
+# Azure Event Hub for cloud-side analytics, dashboarding, and archival.
+#
+# Prerequisites:
+#   1. Azure IoT Operations is installed on the cluster
+#   2. An Azure Event Hub namespace and hub are provisioned
+#   3. A DataflowEndpoint for Event Hub is configured (see below)
+#
+# Event Hub Configuration:
+#   Before applying this dataflow, create a DataflowEndpoint resource that
+#   points to your Event Hub. Example:
+#
+#     apiVersion: connectivity.iotoperations.azure.com/v1
+#     kind: DataflowEndpoint
+#     metadata:
+#       name: event-hub-endpoint
+#       namespace: azure-iot-operations
+#     spec:
+#       endpointType: Kafka
+#       kafkaSettings:
+#         host: "<your-namespace>.servicebus.windows.net:9093"
+#         authentication:
+#           method: SystemAssignedManagedIdentity
+#           systemAssignedManagedIdentitySettings:
+#             audience: "https://<your-namespace>.servicebus.windows.net"
+#         tls:
+#           mode: Enabled
+#
+#   Replace <your-namespace> with your Event Hub namespace.
+#   The managed identity must have "Azure Event Hubs Data Sender" role.
+#
+# Apply:
+#   kubectl apply -f ai-results-to-cloud.yaml
+# =============================================================================
+
+---
+# ---------------------------------------------------------------------------
+# Dataflow — AI Inference Results to Event Hub
+# ---------------------------------------------------------------------------
+# Subscribes to all AI output topics on the local MQTT broker and forwards
+# the results to Azure Event Hub for cloud processing.
+#
+# AI result topics:
+#   - ai/results         — General inference results and metadata
+#   - ai/anomaly-scores  — Real-time anomaly detection scores
+#   - ai/forecasts       — Time-series forecast predictions
+apiVersion: connectivity.iotoperations.azure.com/v1
+kind: Dataflow
+metadata:
+  name: ai-results-to-cloud
+  namespace: azure-iot-operations
+spec:
+  profileRef: sensor-intelligence-profile
+  mode: Enabled
+
+  operations:
+    # -----------------------------------------------------------------
+    # Source: MQTT Broker (AI Result Topics)
+    # -----------------------------------------------------------------
+    # Subscribes to the AI output topics where the inference server
+    # publishes its results.
+    - operationType: Source
+      sourceSettings:
+        # Reference to the AIO MQTT broker
+        endpointRef: aio-broker
+        dataSources:
+          # General AI inference results
+          - "ai/results"
+          # Anomaly detection scores (per-sensor anomaly probabilities)
+          - "ai/anomaly-scores"
+          # Time-series forecasts (predicted future values)
+          - "ai/forecasts"
+
+    # -----------------------------------------------------------------
+    # Transformation: Enrich with Edge Metadata
+    # -----------------------------------------------------------------
+    # Adds edge device and cluster context to each message before
+    # sending to the cloud. This helps identify which edge site
+    # generated the results.
+    - operationType: BuiltInTransformation
+      builtInTransformationSettings:
+        datasets:
+          - key: ai-results-enriched
+            inputs:
+              - "*"
+            expression: >-
+              . + {
+                "edgeTimestamp": now | todate,
+                "sourceTopic": .topic
+              }
+
+    # -----------------------------------------------------------------
+    # Destination: Azure Event Hub
+    # -----------------------------------------------------------------
+    # Forwards enriched AI results to Azure Event Hub.
+    #
+    # To configure the Event Hub destination:
+    #   1. Create an Event Hub namespace in your Azure subscription
+    #   2. Create an Event Hub (topic) named "ai-results" (or your choice)
+    #   3. Create a DataflowEndpoint resource (see comments at top of file)
+    #   4. Update the endpointRef below to match your endpoint name
+    #   5. Set the dataDestination to your Event Hub name
+    - operationType: Destination
+      destinationSettings:
+        # Reference to your Event Hub DataflowEndpoint resource.
+        # Create this endpoint with your Event Hub connection details.
+        endpointRef: event-hub-endpoint
+        # Event Hub (Kafka topic) name to send messages to
+        dataDestination: "ai-results"

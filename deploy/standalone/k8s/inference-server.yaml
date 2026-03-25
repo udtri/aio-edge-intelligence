@@ -1,0 +1,112 @@
+# =============================================================================
+# Inference Server — Standalone Kubernetes Deployment
+# =============================================================================
+# Deploys the time-series AI inference server that hosts foundation models
+# (e.g., MOMENT) for anomaly detection, forecasting, and classification.
+#
+# Apply:
+#   kubectl apply -f inference-server.yaml -n aio-sensor-intelligence
+#
+# GPU Support:
+#   To enable GPU acceleration, uncomment the nvidia.com/gpu resource limit
+#   and ensure the NVIDIA device plugin is installed on your cluster.
+# =============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inference-server
+  namespace: aio-sensor-intelligence
+  labels:
+    app.kubernetes.io/name: inference-server
+    app.kubernetes.io/component: ai-inference
+    app.kubernetes.io/part-of: aio-sensor-intelligence
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: inference-server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: inference-server
+        app.kubernetes.io/component: ai-inference
+    spec:
+      containers:
+        - name: inference-server
+          # Replace with your container registry image path
+          image: aio-sensor-intelligence/inference-server:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              name: http
+              protocol: TCP
+          # ---------------------------------------------------------------
+          # Environment variables loaded from the shared ConfigMap
+          # ---------------------------------------------------------------
+          envFrom:
+            - configMapRef:
+                name: aio-sensor-intelligence-config
+          # ---------------------------------------------------------------
+          # Resource limits
+          # ---------------------------------------------------------------
+          # Adjust based on model size and workload. MOMENT-1-large requires
+          # approximately 1-2 GB of memory for inference.
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: "1"
+              memory: 2Gi
+              # Uncomment below to request a GPU for accelerated inference
+              # nvidia.com/gpu: "1"
+          # ---------------------------------------------------------------
+          # Health probes
+          # ---------------------------------------------------------------
+          # Readiness probe — pod receives traffic only when the model is
+          # loaded and ready to serve predictions
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          # Liveness probe — restart the pod if the server becomes
+          # unresponsive (e.g., OOM or deadlock)
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 5
+      # Allow extra time for model download and initialization on first start
+      terminationGracePeriodSeconds: 30
+
+---
+# ---------------------------------------------------------------------------
+# Service — Inference Server
+# ---------------------------------------------------------------------------
+# Exposes the inference HTTP API within the cluster on port 8080.
+apiVersion: v1
+kind: Service
+metadata:
+  name: inference-server
+  namespace: aio-sensor-intelligence
+  labels:
+    app.kubernetes.io/name: inference-server
+    app.kubernetes.io/component: ai-inference
+    app.kubernetes.io/part-of: aio-sensor-intelligence
+spec:
+  selector:
+    app.kubernetes.io/name: inference-server
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+  type: ClusterIP

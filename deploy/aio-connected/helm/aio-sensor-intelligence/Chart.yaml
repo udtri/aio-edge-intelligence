@@ -1,0 +1,21 @@
+# =============================================================================
+# Helm Chart — aio-sensor-intelligence
+# =============================================================================
+# Deploys time-series AI models on Azure IoT Operations (AIO) for edge
+# inference on industrial sensor data.
+# =============================================================================
+apiVersion: v2
+name: aio-sensor-intelligence
+description: Deploy time-series AI models on Azure IoT Operations
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - azure-iot-operations
+  - time-series
+  - anomaly-detection
+  - edge-ai
+  - moment
+home: https://github.com/Azure-Samples/aio-sensor-intelligence
+maintainers:
+  - name: Azure IoT Operations

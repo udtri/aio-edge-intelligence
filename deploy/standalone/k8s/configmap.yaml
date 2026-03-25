@@ -1,0 +1,61 @@
+# =============================================================================
+# ConfigMap — Shared Configuration for aio-sensor-intelligence
+# =============================================================================
+# Centralizes all configuration values used by the inference server and
+# sensor simulator. Edit these values to customize the deployment.
+#
+# Apply:
+#   kubectl apply -f configmap.yaml -n aio-sensor-intelligence
+# =============================================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aio-sensor-intelligence-config
+  namespace: aio-sensor-intelligence
+  labels:
+    app.kubernetes.io/name: aio-sensor-intelligence
+    app.kubernetes.io/part-of: aio-sensor-intelligence
+data:
+  # ---------------------------------------------------------------------------
+  # Model Configuration
+  # ---------------------------------------------------------------------------
+  # The model provider framework (e.g., "moment" for MOMENT foundation model)
+  MODEL_PROVIDER: "moment"
+  # Hugging Face model identifier or local path
+  MODEL_NAME: "AutonLab/MOMENT-1-large"
+  # Compute device: "auto" (detect GPU/CPU), "cpu", or "cuda"
+  DEVICE: "auto"
+  # Number of time-series data points per inference window
+  WINDOW_SIZE: "512"
+  # Default AI task: anomaly_detection, forecasting, classification, or imputation
+  DEFAULT_TASK: "anomaly_detection"
+
+  # ---------------------------------------------------------------------------
+  # MQTT Broker Configuration
+  # ---------------------------------------------------------------------------
+  # In standalone mode, this points to the local Mosquitto service.
+  # In AIO-connected mode, use the AIO broker address (e.g., "aio-broker").
+  MQTT_BROKER_HOST: "mosquitto"
+  MQTT_BROKER_PORT: "1883"
+
+  # ---------------------------------------------------------------------------
+  # Sensor Topics
+  # ---------------------------------------------------------------------------
+  # Comma-separated list of MQTT topics to subscribe to for sensor data.
+  # The inference server listens on these topics for incoming time-series data.
+  SENSOR_TOPICS: "sensors/temperature,sensors/vibration,sensors/pressure"
+
+  # ---------------------------------------------------------------------------
+  # AI Output Topics
+  # ---------------------------------------------------------------------------
+  # Topics where the inference server publishes results
+  AI_RESULTS_TOPIC: "ai/results"
+  AI_ANOMALY_SCORES_TOPIC: "ai/anomaly-scores"
+  AI_FORECASTS_TOPIC: "ai/forecasts"
+
+  # ---------------------------------------------------------------------------
+  # Sensor Simulator Settings
+  # ---------------------------------------------------------------------------
+  # Interval (in seconds) between simulated sensor readings
+  PUBLISH_INTERVAL: "1.0"

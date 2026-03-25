@@ -1,0 +1,56 @@
+# =============================================================================
+# Sensor Simulator — Standalone Kubernetes Deployment
+# =============================================================================
+# Generates synthetic time-series sensor data and publishes to MQTT topics.
+# Used for testing and demos when real OPC UA devices are unavailable.
+#
+# In production, this is typically disabled and replaced by real sensor data
+# flowing through the AIO OPC UA connector.
+#
+# Apply:
+#   kubectl apply -f sensor-simulator.yaml -n aio-sensor-intelligence
+# =============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sensor-simulator
+  namespace: aio-sensor-intelligence
+  labels:
+    app.kubernetes.io/name: sensor-simulator
+    app.kubernetes.io/component: data-generator
+    app.kubernetes.io/part-of: aio-sensor-intelligence
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: sensor-simulator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: sensor-simulator
+        app.kubernetes.io/component: data-generator
+    spec:
+      containers:
+        - name: sensor-simulator
+          # Replace with your container registry image path
+          image: aio-sensor-intelligence/sensor-simulator:latest
+          imagePullPolicy: IfNotPresent
+          # ---------------------------------------------------------------
+          # Environment variables loaded from the shared ConfigMap
+          # ---------------------------------------------------------------
+          envFrom:
+            - configMapRef:
+                name: aio-sensor-intelligence-config
+          # ---------------------------------------------------------------
+          # Resource limits — simulator is lightweight
+          # ---------------------------------------------------------------
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+      # No need for graceful shutdown — simulator has no persistent state
+      terminationGracePeriodSeconds: 5

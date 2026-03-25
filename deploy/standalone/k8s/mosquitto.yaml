@@ -1,0 +1,127 @@
+# =============================================================================
+# Mosquitto MQTT Broker — Standalone Kubernetes Deployment
+# =============================================================================
+# Deploys Eclipse Mosquitto as the local MQTT broker for message routing.
+# In AIO-connected mode, this is replaced by the Azure IoT Operations broker.
+#
+# Apply:
+#   kubectl apply -f mosquitto.yaml -n aio-sensor-intelligence
+# =============================================================================
+
+---
+# ---------------------------------------------------------------------------
+# ConfigMap — Mosquitto Configuration
+# ---------------------------------------------------------------------------
+# Provides the mosquitto.conf file. Anonymous access is enabled for local
+# development; replace with proper auth for production use.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mosquitto-config
+  namespace: aio-sensor-intelligence
+  labels:
+    app.kubernetes.io/name: mosquitto
+    app.kubernetes.io/component: mqtt-broker
+    app.kubernetes.io/part-of: aio-sensor-intelligence
+data:
+  mosquitto.conf: |
+    # Mosquitto MQTT Broker Configuration
+    # Listen on all interfaces, port 1883 (standard MQTT)
+    listener 1883
+    # Allow connections without username/password (development only)
+    allow_anonymous true
+    # Logging
+    log_dest stdout
+    log_type all
+    # Persistence
+    persistence true
+    persistence_location /mosquitto/data/
+
+---
+# ---------------------------------------------------------------------------
+# Deployment — Mosquitto
+# ---------------------------------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mosquitto
+  namespace: aio-sensor-intelligence
+  labels:
+    app.kubernetes.io/name: mosquitto
+    app.kubernetes.io/component: mqtt-broker
+    app.kubernetes.io/part-of: aio-sensor-intelligence
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mosquitto
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mosquitto
+        app.kubernetes.io/component: mqtt-broker
+    spec:
+      containers:
+        - name: mosquitto
+          image: eclipse-mosquitto:2
+          ports:
+            - containerPort: 1883
+              name: mqtt
+              protocol: TCP
+          volumeMounts:
+            # Mount the ConfigMap as the Mosquitto config file
+            - name: config
+              mountPath: /mosquitto/config/mosquitto.conf
+              subPath: mosquitto.conf
+              readOnly: true
+            # Persistent storage for retained messages and subscriptions
+            - name: data
+              mountPath: /mosquitto/data
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          readinessProbe:
+            tcpSocket:
+              port: 1883
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 1883
+            initialDelaySeconds: 10
+            periodSeconds: 20
+      volumes:
+        - name: config
+          configMap:
+            name: mosquitto-config
+        - name: data
+          emptyDir: {}
+
+---
+# ---------------------------------------------------------------------------
+# Service — Mosquitto
+# ---------------------------------------------------------------------------
+# Exposes the MQTT broker within the cluster. Other pods connect via
+# mosquitto.aio-sensor-intelligence.svc.cluster.local:1883
+apiVersion: v1
+kind: Service
+metadata:
+  name: mosquitto
+  namespace: aio-sensor-intelligence
+  labels:
+    app.kubernetes.io/name: mosquitto
+    app.kubernetes.io/component: mqtt-broker
+    app.kubernetes.io/part-of: aio-sensor-intelligence
+spec:
+  selector:
+    app.kubernetes.io/name: mosquitto
+  ports:
+    - name: mqtt
+      port: 1883
+      targetPort: 1883
+      protocol: TCP
+  type: ClusterIP
