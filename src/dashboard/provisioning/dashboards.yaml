@@ -1,0 +1,12 @@
+apiVersion: 1
+providers:
+  - name: 'aio-sensor-intelligence'
+    folder: 'AIO Sensor Intelligence'
+    type: file
+    disableDeletion: false
+    editable: true
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

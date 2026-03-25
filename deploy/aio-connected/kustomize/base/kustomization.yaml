@@ -1,0 +1,20 @@
+# =============================================================================
+# Kustomize Base — AIO Sensor Intelligence
+# =============================================================================
+# References the standalone Kubernetes manifests as base resources and applies
+# common labels across all resources.
+# =============================================================================
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../standalone/k8s/namespace.yaml
+  - ../../standalone/k8s/configmap.yaml
+  - ../../standalone/k8s/mosquitto.yaml
+  - ../../standalone/k8s/inference-server.yaml
+  - ../../standalone/k8s/sensor-simulator.yaml
+
+commonLabels:
+  app.kubernetes.io/part-of: aio-sensor-intelligence
+  app.kubernetes.io/managed-by: kustomize

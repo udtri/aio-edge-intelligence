@@ -23,14 +23,13 @@ from .base import (
     TASK_FORECAST,
     TASK_IMPUTATION,
 )
-from .chronos_provider import ChronosProvider
 from .custom_provider import CustomProvider
-from .moirai_provider import MoiraiProvider
 
 logger = logging.getLogger(__name__)
 
-# Attempt to import the default MOMENT provider; it depends on
-# ``momentfm`` which may not be installed in every environment.
+# Attempt to import providers that depend on optional packages.
+# Each is guarded so that a missing dependency doesn't break the registry.
+
 try:
     from .moment_provider import MomentProvider
 except ImportError:
@@ -40,17 +39,37 @@ except ImportError:
         "Install with: pip install momentfm"
     )
 
+try:
+    from .moirai_provider import MoiraiProvider
+except ImportError:
+    MoiraiProvider = None  # type: ignore[assignment,misc]
+    logger.warning(
+        "uni2ts is not installed — MoiraiProvider unavailable. "
+        "Install with: pip install uni2ts"
+    )
+
+try:
+    from .chronos_provider import ChronosProvider
+except ImportError:
+    ChronosProvider = None  # type: ignore[assignment,misc]
+    logger.warning(
+        "chronos-forecasting is not installed — ChronosProvider unavailable. "
+        "Install with: pip install chronos-forecasting"
+    )
+
 # ---------------------------------------------------------------------------
 # Provider registry
 # ---------------------------------------------------------------------------
 _REGISTRY: dict[str, type[ModelProvider]] = {
-    "moirai": MoiraiProvider,
-    "chronos": ChronosProvider,
     "custom": CustomProvider,
 }
 
 if MomentProvider is not None:
     _REGISTRY["moment"] = MomentProvider
+if MoiraiProvider is not None:
+    _REGISTRY["moirai"] = MoiraiProvider
+if ChronosProvider is not None:
+    _REGISTRY["chronos"] = ChronosProvider
 
 
 def get_provider(name: str, **kwargs: Any) -> ModelProvider:

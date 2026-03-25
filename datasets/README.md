@@ -4,7 +4,41 @@ This directory contains links and instructions for public datasets you
 can use to test and evaluate **aio-sensor-intelligence**.
 
 > **Note:** These datasets are not included in the repository due to
-> size.  Follow the download instructions below.
+> size.  Follow the download instructions below or use the automated
+> download script.
+
+## Quick Start — Automated Download
+
+Use `datasets/scripts/download_datasets.py` to download datasets with a
+single command (requires only the Python standard library):
+
+```bash
+# Download a synthetic sample dataset (always works, no network issues)
+python datasets/scripts/download_datasets.py --dataset sample
+
+# Download the NASA C-MAPSS turbofan dataset
+python datasets/scripts/download_datasets.py --dataset cmapss
+
+# Download the CWRU bearing fault dataset
+python datasets/scripts/download_datasets.py --dataset cwru
+
+# Download everything
+python datasets/scripts/download_datasets.py --dataset all
+```
+
+The script saves files under `datasets/data/<name>/`.  If an automated
+download fails (some public dataset servers restrict automated access) the
+script prints clear manual-download instructions.
+
+The **sample** dataset is a synthetic but realistic fallback that always
+works offline.  It generates three CSV files (10 000 rows each) with
+injected anomalies — useful for quick testing:
+
+| File | Signal | Anomaly type |
+|------|--------|-------------|
+| `vibration_motor.csv` | Motor vibration (g) | Bearing-wear degradation + spike anomalies |
+| `temperature_furnace.csv` | Furnace temperature (°C) | Thermal drift anomaly |
+| `pressure_hydraulic.csv` | Hydraulic pressure (bar) | Gradual leak + sudden drops |
 
 ---
 
@@ -151,22 +185,31 @@ all_vars = df.values[:512, :]  # shape: (512, 52)
 ```
 datasets/
 ├── README.md              ← this file
-├── cmapss/
-│   ├── train_FD001.txt
-│   ├── test_FD001.txt
-│   ├── RUL_FD001.txt
-│   └── …
-├── cwru/
-│   ├── 105.mat
-│   ├── 118.mat
-│   └── …
-├── secom/
-│   ├── secom.data
-│   └── secom_labels.data
-└── tep/
-    ├── d00.dat
-    ├── d01.dat
-    └── …
+├── scripts/
+│   └── download_datasets.py
+├── data/
+│   ├── cmapss/
+│   │   ├── train_FD001.txt
+│   │   ├── test_FD001.txt
+│   │   ├── RUL_FD001.txt
+│   │   └── …
+│   ├── cwru/
+│   │   ├── normal_0.mat
+│   │   ├── IR007_0.mat
+│   │   └── …
+│   ├── sample/
+│   │   ├── vibration_motor.csv
+│   │   ├── temperature_furnace.csv
+│   │   └── pressure_hydraulic.csv
+│   ├── secom/
+│   │   ├── secom.data
+│   │   └── secom_labels.data
+│   └── tep/
+│       ├── d00.dat
+│       ├── d01.dat
+│       └── …
+└── custom/
+    └── (your own data)
 ```
 
 ---

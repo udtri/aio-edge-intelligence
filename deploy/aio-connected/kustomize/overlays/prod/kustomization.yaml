@@ -1,0 +1,88 @@
+# =============================================================================
+# Kustomize Overlay — Production
+# =============================================================================
+# Higher resource limits, 2 replicas for the inference server, info logging,
+# and explicit resource requests for all workloads.
+# =============================================================================
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+
+patches:
+  # --- Inference server: higher resources, 2 replicas, info logging ---------
+  - target:
+      kind: Deployment
+      name: inference-server
+    patch: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: inference-server
+      spec:
+        replicas: 2
+        template:
+          spec:
+            containers:
+              - name: inference-server
+                resources:
+                  requests:
+                    cpu: "1"
+                    memory: 2Gi
+                  limits:
+                    cpu: "2"
+                    memory: 4Gi
+                env:
+                  - name: LOG_LEVEL
+                    value: INFO
+
+  # --- Sensor simulator: production resources, info logging -----------------
+  - target:
+      kind: Deployment
+      name: sensor-simulator
+    patch: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: sensor-simulator
+      spec:
+        replicas: 2
+        template:
+          spec:
+            containers:
+              - name: sensor-simulator
+                resources:
+                  requests:
+                    cpu: 100m
+                    memory: 128Mi
+                  limits:
+                    cpu: 250m
+                    memory: 256Mi
+                env:
+                  - name: LOG_LEVEL
+                    value: INFO
+
+  # --- Mosquitto: production resources --------------------------------------
+  - target:
+      kind: Deployment
+      name: mosquitto
+    patch: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: mosquitto
+      spec:
+        replicas: 1
+        template:
+          spec:
+            containers:
+              - name: mosquitto
+                resources:
+                  requests:
+                    cpu: 100m
+                    memory: 128Mi
+                  limits:
+                    cpu: 500m
+                    memory: 256Mi

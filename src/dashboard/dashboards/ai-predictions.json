@@ -1,0 +1,612 @@
+{
+  "uid": "ai-predictions",
+  "title": "AI Predictions — Anomaly Detection & Forecasting",
+  "description": "AI-driven anomaly detection, forecasting, and multi-sensor fusion dashboards.",
+  "tags": ["ai", "anomaly", "forecasting", "aio"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "graphTooltip": 1,
+  "refresh": "5s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": ["5s", "10s", "30s", "1m", "5m"]
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "model_provider",
+        "label": "Model Provider",
+        "type": "custom",
+        "query": "anomaly_detector,forecaster,fusion_model",
+        "current": {
+          "text": "anomaly_detector",
+          "value": "anomaly_detector"
+        },
+        "options": [
+          { "text": "anomaly_detector", "value": "anomaly_detector", "selected": true },
+          { "text": "forecaster", "value": "forecaster", "selected": false },
+          { "text": "fusion_model", "value": "fusion_model", "selected": false }
+        ],
+        "multi": false,
+        "includeAll": false
+      },
+      {
+        "name": "task_type",
+        "label": "Task Type",
+        "type": "custom",
+        "query": "anomaly_detection,forecasting,fusion",
+        "current": {
+          "text": "anomaly_detection",
+          "value": "anomaly_detection"
+        },
+        "options": [
+          { "text": "anomaly_detection", "value": "anomaly_detection", "selected": true },
+          { "text": "forecasting", "value": "forecasting", "selected": false },
+          { "text": "fusion", "value": "fusion", "selected": false }
+        ],
+        "multi": false,
+        "includeAll": false
+      },
+      {
+        "name": "sensor_id",
+        "label": "Sensor ID",
+        "type": "custom",
+        "query": "sensor-001,sensor-002,sensor-003,sensor-004,sensor-005",
+        "current": {
+          "text": "sensor-001",
+          "value": "sensor-001"
+        },
+        "options": [
+          { "text": "sensor-001", "value": "sensor-001", "selected": true },
+          { "text": "sensor-002", "value": "sensor-002", "selected": false },
+          { "text": "sensor-003", "value": "sensor-003", "selected": false },
+          { "text": "sensor-004", "value": "sensor-004", "selected": false },
+          { "text": "sensor-005", "value": "sensor-005", "selected": false }
+        ],
+        "multi": false,
+        "includeAll": true,
+        "allValue": ".*"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "row",
+      "title": "Anomaly Detection",
+      "id": 1,
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+    },
+    {
+      "id": 2,
+      "title": "Anomaly Score",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 10, "x": 0, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisLabel": "Anomaly Score",
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "gradientMode": "scheme",
+            "showPoints": "auto",
+            "pointSize": 5,
+            "spanNulls": false,
+            "thresholdsStyle": {
+              "mode": "line"
+            }
+          },
+          "unit": "none",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 0.7 }
+            ]
+          },
+          "displayName": "Anomaly Score"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "anomaly_score{sensor_id=\"${sensor_id}\", model=\"${model_provider}\"}",
+          "legendFormat": "Anomaly Score"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Alert Status",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 4, "x": 10, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 0.7 }
+            ]
+          },
+          "unit": "none",
+          "min": 0,
+          "max": 1,
+          "mappings": [
+            {
+              "type": "range",
+              "options": {
+                "from": 0,
+                "to": 0.699,
+                "result": { "text": "NORMAL", "color": "green", "index": 0 }
+              }
+            },
+            {
+              "type": "range",
+              "options": {
+                "from": 0.7,
+                "to": 1,
+                "result": { "text": "ANOMALY", "color": "red", "index": 1 }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "graphMode": "none",
+        "colorMode": "background",
+        "justifyMode": "center",
+        "textMode": "auto",
+        "orientation": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "anomaly_score{sensor_id=\"${sensor_id}\", model=\"${model_provider}\"}",
+          "legendFormat": "Alert Status",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Anomaly Event Log",
+      "type": "table",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 10, "x": 14, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto",
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Time" },
+            "properties": [
+              { "id": "displayName", "value": "Detected At" },
+              { "id": "custom.width", "value": 200 }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "sensor_id" },
+            "properties": [
+              { "id": "displayName", "value": "Sensor" },
+              { "id": "custom.width", "value": 120 }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Value" },
+            "properties": [
+              { "id": "displayName", "value": "Anomaly Score" },
+              { "id": "custom.displayMode", "value": "color-background" },
+              { "id": "thresholds", "value": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 0.7 }
+                ]
+              }}
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [{ "displayName": "Detected At", "desc": true }],
+        "footer": { "show": false }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "anomaly_score{sensor_id=~\"${sensor_id}\"} > 0.7",
+          "legendFormat": "{{sensor_id}}",
+          "format": "table",
+          "instant": false
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Forecasting",
+      "id": 5,
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 }
+    },
+    {
+      "id": 6,
+      "title": "Actual vs Predicted",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 10, "x": 0, "y": 10 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisLabel": "Value",
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "showPoints": "auto",
+            "pointSize": 4,
+            "spanNulls": false
+          },
+          "unit": "none"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Actual" },
+            "properties": [
+              { "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } },
+              { "id": "custom.lineWidth", "value": 2 }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Predicted" },
+            "properties": [
+              { "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } },
+              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 5] } },
+              { "id": "custom.lineWidth", "value": 2 }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sensor_vibration{sensor_id=\"${sensor_id}\"}",
+          "legendFormat": "Actual"
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "forecast_value{sensor_id=\"${sensor_id}\", model=\"${model_provider}\", task=\"${task_type}\"}",
+          "legendFormat": "Predicted"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Forecast Confidence Bands",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 10, "x": 10, "y": 10 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisLabel": "Value",
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "unit": "none"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Forecast" },
+            "properties": [
+              { "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } },
+              { "id": "custom.lineWidth", "value": 2 }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Upper Bound" },
+            "properties": [
+              { "id": "color", "value": { "fixedColor": "light-orange", "mode": "fixed" } },
+              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [5, 5] } },
+              { "id": "custom.fillBelowTo", "value": "Lower Bound" },
+              { "id": "custom.fillOpacity", "value": 15 }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Lower Bound" },
+            "properties": [
+              { "id": "color", "value": { "fixedColor": "light-orange", "mode": "fixed" } },
+              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [5, 5] } }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "forecast_value{sensor_id=\"${sensor_id}\", model=\"${model_provider}\"}",
+          "legendFormat": "Forecast"
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "forecast_upper_bound{sensor_id=\"${sensor_id}\", model=\"${model_provider}\"}",
+          "legendFormat": "Upper Bound"
+        },
+        {
+          "refId": "C",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "forecast_lower_bound{sensor_id=\"${sensor_id}\", model=\"${model_provider}\"}",
+          "legendFormat": "Lower Bound"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Forecast Accuracy",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 4, "x": 20, "y": 10 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 70 },
+              { "color": "green", "value": 90 }
+            ]
+          },
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "displayName": "Accuracy"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "graphMode": "area",
+        "colorMode": "value",
+        "justifyMode": "center",
+        "textMode": "auto",
+        "orientation": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "forecast_accuracy{model=\"${model_provider}\", task=\"${task_type}\", sensor_id=\"${sensor_id}\"}",
+          "legendFormat": "Accuracy"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Multi-Sensor Fusion",
+      "id": 9,
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 18 }
+    },
+    {
+      "id": 10,
+      "title": "Per-Channel Anomaly Scores",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 19 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisLabel": "Anomaly Score",
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "showPoints": "auto",
+            "pointSize": 4,
+            "spanNulls": false
+          },
+          "unit": "none",
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "channel_anomaly_score{sensor_id=\"${sensor_id}\", channel=\"vibration\"}",
+          "legendFormat": "Vibration"
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "channel_anomaly_score{sensor_id=\"${sensor_id}\", channel=\"temperature\"}",
+          "legendFormat": "Temperature"
+        },
+        {
+          "refId": "C",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "channel_anomaly_score{sensor_id=\"${sensor_id}\", channel=\"pressure\"}",
+          "legendFormat": "Pressure"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "title": "Fused Anomaly Score",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 19 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "fixedColor": "dark-red", "mode": "fixed" },
+          "custom": {
+            "axisLabel": "Fused Score",
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 15,
+            "gradientMode": "scheme",
+            "showPoints": "auto",
+            "pointSize": 5,
+            "spanNulls": false,
+            "thresholdsStyle": {
+              "mode": "line"
+            }
+          },
+          "unit": "none",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 0.7 }
+            ]
+          },
+          "displayName": "Fused Anomaly Score"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "fused_anomaly_score{sensor_id=\"${sensor_id}\", model=\"${model_provider}\"}",
+          "legendFormat": "Fused Score"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "title": "Sensor Health Matrix",
+      "type": "state-timeline",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 19 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.5 },
+              { "color": "red", "value": 0.7 }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "range",
+              "options": {
+                "from": 0,
+                "to": 0.499,
+                "result": { "text": "Healthy", "color": "green", "index": 0 }
+              }
+            },
+            {
+              "type": "range",
+              "options": {
+                "from": 0.5,
+                "to": 0.699,
+                "result": { "text": "Warning", "color": "yellow", "index": 1 }
+              }
+            },
+            {
+              "type": "range",
+              "options": {
+                "from": 0.7,
+                "to": 1,
+                "result": { "text": "Critical", "color": "red", "index": 2 }
+              }
+            }
+          ],
+          "unit": "none",
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "showValue": "auto",
+        "rowHeight": 0.8,
+        "mergeValues": true,
+        "alignValue": "center",
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sensor_health_score{sensor_id=~\"sensor-.*\"}",
+          "legendFormat": "{{sensor_id}}"
+        }
+      ]
+    }
+  ]
+}

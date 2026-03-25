@@ -1,0 +1,22 @@
+apiVersion: 1
+datasources:
+  - name: MQTT
+    type: grafana-mqtt-datasource
+    access: proxy
+    url: mqtt://mosquitto:1883
+    uid: mqtt
+    isDefault: true
+    editable: true
+    jsonData:
+      keepAlive: 60
+
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    uid: prometheus
+    isDefault: false
+    editable: true
+    jsonData:
+      timeInterval: 5s
+      queryTimeout: 30s

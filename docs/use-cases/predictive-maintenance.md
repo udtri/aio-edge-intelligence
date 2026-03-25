@@ -168,6 +168,183 @@ outer race, and ball defect types — with zero fine-tuning.
 
 ---
 
+## Using the Task Pipeline (Code Examples)
+
+### Anomaly Detection
+
+```python
+from collections import deque
+import numpy as np
+
+from model_providers.moment_provider import MomentProvider
+from tasks import AnomalyDetector
+
+# Initialise provider and detector
+provider = MomentProvider(device="cpu")
+provider.load()
+
+detector = AnomalyDetector(provider, threshold=0.7)
+
+# --- Batch detection on a NumPy array ---
+window = np.random.randn(512)  # replace with real sensor data
+result = detector.detect(window, sensor_id="pump-bearing-01")
+print(result.is_anomaly)      # True / False
+print(result.severity)        # "normal", "warning", or "critical"
+print(result.anomaly_scores)  # per-timestep scores
+
+# --- Streaming detection with a sliding window ---
+buffer = deque(maxlen=512)
+for sample in sensor_stream():          # your real-time data source
+    buffer.append(sample)
+    if len(buffer) == 512:
+        result = detector.detect_stream(buffer, sensor_id="pump-bearing-01")
+        if result.is_anomaly:
+            publish_alert(result)        # push to MQTT / dashboard
+
+# --- Adaptive thresholding ---
+# After processing several windows the detector tracks rolling stats:
+stats = detector.get_rolling_stats()
+print(f"Adaptive threshold: {stats['adaptive_threshold']:.3f}")
+```
+
+### Forecasting & Remaining Useful Life
+
+```python
+from tasks import Forecaster
+
+forecaster = Forecaster(provider, default_horizon=96)
+
+# Point forecast
+fc = forecaster.forecast(window, sensor_id="pump-bearing-01")
+print(fc.forecast_values)      # list of 96 predicted values
+
+# Forecast with 95 % confidence interval
+ci = forecaster.forecast_with_confidence(window, horizon=96, n_samples=50)
+print(ci["lower_95"])          # 2.5th percentile
+print(ci["upper_95"])          # 97.5th percentile
+
+# Remaining Useful Life estimation
+rul = forecaster.estimate_rul(
+    window,
+    failure_threshold=5.0,     # vibration threshold in g
+    sampling_rate_hz=10.0,
+)
+if rul["threshold_breached"]:
+    print(f"Estimated RUL: {rul['rul_seconds']:.0f} seconds")
+else:
+    print("No failure predicted within forecast horizon")
+```
+
+---
+
+## MQTT Topic Configuration
+
+| Topic | Direction | Description |
+|---|---|---|
+| `sensors/vibration/{machine_id}` | **Inbound** | Raw vibration data from sensors |
+| `sensors/temperature/{machine_id}` | **Inbound** | Bearing/winding temperature |
+| `ai/results` | **Outbound** | Anomaly scores, forecasts, severity |
+| `ai/alerts/warning` | **Outbound** | Scores in the warning band (0.5–0.7) |
+| `ai/alerts/critical` | **Outbound** | Scores in the critical band (≥ 0.7) |
+| `ai/rul/{machine_id}` | **Outbound** | RUL estimates for each machine |
+
+### Inbound payload schema
+
+```json
+{
+    "timestamp": "2025-01-15T10:30:00.000Z",
+    "sensor_id": "pump-bearing-01",
+    "values": [2.345, 2.351, 2.338, "..."],
+    "channels": 1,
+    "metadata": { "unit": "g", "sampling_rate_hz": 10 }
+}
+```
+
+### Outbound alert payload schema
+
+```json
+{
+    "sensor_id": "pump-bearing-01",
+    "anomaly_scores": [0.12, 0.15, "...", 0.78],
+    "threshold": 0.7,
+    "is_anomaly": true,
+    "severity": "critical",
+    "timestamp": "2025-01-15T10:30:05.120Z"
+}
+```
+
+---
+
+## Anomaly Score Ranges & Severity Mapping
+
+| Score Range | Severity | What It Means | Recommended Action |
+|---|---|---|---|
+| **0.0 – 0.3** | `normal` | Reconstruction error is within normal variation. Signal matches learned healthy patterns. | No action needed. |
+| **0.3 – 0.5** | `normal` | Slight deviation. Often caused by load changes or minor environmental shifts. | Continue monitoring. |
+| **0.5 – 0.7** | `warning` | Sustained elevated error. Emerging fault signatures (e.g., new spectral peaks at bearing defect frequencies). | Investigate within 48 hours; schedule inspection. |
+| **0.7 – 0.9** | `critical` | Strong fault signature. Model reconstruction diverges significantly from actual signal. | Plan maintenance within 24 hours. |
+| **0.9 – 1.0** | `critical` | Imminent failure. Broadband energy increase, impact events, or signal saturation. | Immediate controlled shutdown and repair. |
+
+> **Tip:** Use ``AnomalyDetector.get_rolling_stats()`` to see the
+> adaptive threshold the system has learned from your data.  Start with
+> the defaults and adjust ``severity_thresholds`` after observing your
+> equipment under known-good and known-bad conditions.
+
+---
+
+## Setting Up Alerting Thresholds
+
+### Static thresholds (simple)
+
+```python
+# Use a fixed threshold — good for well-characterised equipment
+detector = AnomalyDetector(provider, threshold=0.65)
+```
+
+### Adaptive thresholds (recommended)
+
+```python
+# Let the detector learn the baseline from the first N windows
+detector = AnomalyDetector(provider)  # no fixed threshold
+
+# During a known-healthy warm-up period, run detect() on each window.
+# The detector accumulates rolling statistics automatically.
+for window in healthy_warmup_windows:
+    detector.detect(window)
+
+# After warm-up, the auto-threshold adapts: mean + 2·std of scores.
+stats = detector.get_rolling_stats()
+print(f"Learned baseline mean: {stats['mean']:.4f}")
+print(f"Adaptive threshold:    {stats['adaptive_threshold']:.4f}")
+```
+
+### Custom severity bands
+
+```python
+from tasks.anomaly_detection import AnomalyDetector, Severity
+
+detector = AnomalyDetector(
+    provider,
+    severity_thresholds={
+        Severity.NORMAL:   (0.0, 0.4),
+        Severity.WARNING:  (0.4, 0.6),
+        Severity.CRITICAL: (0.6, 1.0),
+    },
+)
+```
+
+### Routing alerts by severity
+
+```bash
+# Environment variables for the inference server
+ALERT_TOPIC_WARNING=ai/alerts/warning
+ALERT_TOPIC_CRITICAL=ai/alerts/critical
+ANOMALY_THRESHOLD_WARNING=0.5
+ANOMALY_THRESHOLD_CRITICAL=0.7
+```
+
+---
+
 ## Integration with AIO Dataflows
 
 Route critical alerts to the cloud for fleet-wide visibility:

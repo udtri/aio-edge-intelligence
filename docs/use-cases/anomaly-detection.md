@@ -102,54 +102,6 @@ helm install aio-sensor-intelligence deploy/helm/aio-sensor-intelligence \
 
 ---
 
-## Configuring Alert Thresholds
-
-Thresholds control when anomaly detections become actionable alerts.
-Configure them based on your process tolerance and desired
-sensitivity.
-
-### Global Threshold
-
-Set via environment variable:
-```bash
-ANOMALY_THRESHOLD=0.6
-```
-
-Any anomaly score above this value is flagged as `is_anomaly: true` in
-the result payload.
-
-### Per-Sensor Threshold (Advanced)
-
-For processes where different sensor types have different criticality:
-
-```json
-{
-    "thresholds": {
-        "temperature": 0.5,
-        "pressure": 0.7,
-        "vibration": 0.6,
-        "flow": 0.65
-    }
-}
-```
-
-Pass as `ANOMALY_THRESHOLDS_JSON` environment variable.
-
-### Tuning Guidance
-
-| If you get … | Adjust … |
-|---|---|
-| Too many false alarms | Raise threshold (e.g., 0.6 → 0.75) |
-| Missed real anomalies | Lower threshold (e.g., 0.6 → 0.45) |
-| Alerts too late | Reduce STRIDE for more frequent checks |
-| Alerts too noisy | Increase WINDOW_SIZE for more context |
-
-> **Tip:** Start with the default threshold (0.6), run for 24–48 hours
-> on known-good production data, and observe the score distribution.
-> Set the threshold at the 99th percentile of normal scores.
-
----
-
 ## Result Payload
 
 ```json
@@ -173,15 +125,167 @@ Pass as `ANOMALY_THRESHOLDS_JSON` environment variable.
 
 ---
 
+## Multi-Sensor Fusion Architecture
+
+For complex manufacturing processes, monitoring sensors independently
+is not enough.  Correlated deviations across multiple channels — e.g.
+temperature rising while pressure drops — often indicate the earliest
+stages of a fault.
+
+The **SensorFusionEngine** (in `samples/03-end-to-end/multi_sensor_fusion.py`)
+implements a lightweight fusion layer that sits between per-channel
+MOMENT inference and the alerting pipeline.
+
+### Architecture Diagram
+
+```
+                ┌──────────────┐
+  Temp sensor ──┤  MOMENT      ├──► score_temp ──┐
+                │  (per-channel │                 │
+  Pres sensor ──┤   anomaly    ├──► score_pres ──┼──► SensorFusionEngine ──► fused_score
+                │   detection) │                 │         │
+  Vib  sensor ──┤              ├──► score_vib  ──┘         ▼
+                └──────────────┘                    is_anomaly? ──► MQTT publish
+                                                                   ──► AIO Dataflow
+```
+
+### Fusion Strategies
+
+| Strategy           | Formula                              | Best for                        |
+|--------------------|--------------------------------------|---------------------------------|
+| `weighted_average` | Σ(weight × score) / Σ(weight)       | General process monitoring      |
+| `max`              | max(score across channels)           | Safety-critical — alert on any  |
+| `voting`           | fraction of channels above threshold | Reducing false positives         |
+
+### Code Example
+
+```python
+from multi_sensor_fusion import SensorFusionEngine
+
+engine = SensorFusionEngine(strategy="weighted_average", global_threshold=0.7)
+
+# Register channels with individual weights and thresholds
+engine.add_channel("temperature", weight=1.2, threshold=0.65)
+engine.add_channel("pressure",    weight=1.0, threshold=0.70)
+engine.add_channel("vibration",   weight=0.8, threshold=0.60)
+
+# After running MOMENT on each channel's window:
+engine.update("temperature", 0.45)
+engine.update("pressure",    0.80)
+engine.update("vibration",   0.30)
+
+print(engine.fused_score())   # 0.5133 (weighted average)
+print(engine.is_anomaly())    # False (below 0.7)
+
+# Get detailed per-channel + fused status
+status = engine.get_status()
+for ch in status["channels"]:
+    print(f"  {ch['name']}: score={ch['latest_score']:.2f}  anomaly={ch['is_anomaly']}")
+```
+
+---
+
+## MQTT Topic Mapping for Multi-Sensor Scenarios
+
+When running with the `MQTTBridge`, each sensor type publishes to a
+dedicated topic hierarchy.  The inference server subscribes to all of
+them via a wildcard and routes results to a parallel results tree.
+
+### Input Topics (sensor data)
+
+```
+sensors/temperature/{process_unit_id}
+sensors/pressure/{process_unit_id}
+sensors/flow/{process_unit_id}
+sensors/vibration/{process_unit_id}
+```
+
+### Result Topics (per-channel anomaly scores)
+
+```
+ai/results/temperature/{process_unit_id}
+ai/results/pressure/{process_unit_id}
+ai/results/flow/{process_unit_id}
+ai/results/vibration/{process_unit_id}
+```
+
+### Fused Result Topic
+
+```
+ai/results/fused/{process_unit_id}
+```
+
+The fused topic carries the combined score from the
+`SensorFusionEngine` and is the recommended source for downstream
+alerting rules.
+
+### Example MQTT Configuration
+
+```bash
+# Subscribe to all sensor types across all process units
+MQTT_TOPICS=sensors/+/+
+
+# Results published to
+MQTT_TOPIC_RESULTS=ai/results
+
+# Fusion-specific settings
+FUSION_STRATEGY=weighted_average
+FUSION_GLOBAL_THRESHOLD=0.7
+```
+
+---
+
+## Configuring Per-Sensor Thresholds
+
+Different sensor types have different noise characteristics and
+criticality levels.  Configure per-sensor thresholds via the
+`ANOMALY_THRESHOLDS_JSON` environment variable:
+
+```json
+{
+    "thresholds": {
+        "temperature": 0.50,
+        "pressure": 0.70,
+        "vibration": 0.60,
+        "flow": 0.65
+    },
+    "weights": {
+        "temperature": 1.2,
+        "pressure": 1.0,
+        "vibration": 0.8,
+        "flow": 0.9
+    },
+    "fusion_strategy": "weighted_average",
+    "global_threshold": 0.7
+}
+```
+
+### How to Tune
+
+1. **Collect baseline data** — run the system for 24–48 hours on
+   known-good production data.
+2. **Observe score distributions** — per-channel and fused.
+3. **Set channel thresholds** at the 99th percentile of normal scores
+   for that channel.
+4. **Set the global threshold** at the 99th percentile of fused scores.
+5. **Iterate** — lower thresholds for safety-critical channels,
+   raise them for noisy-but-non-critical sensors.
+
+---
+
 ## Integration with AIO Dataflows for Cloud Alerting
 
-### Route All Anomalies to Azure Event Hubs
+The sensor fusion engine publishes results to the MQTT broker.  AIO
+dataflows then route anomaly events to cloud services for alerting,
+storage, and dashboarding.
+
+### Route Fused Anomalies to Azure Event Hubs
 
 ```yaml
 apiVersion: connectivity.iotoperations.azure.com/v1
 kind: Dataflow
 metadata:
-  name: anomalies-to-cloud
+  name: fused-anomalies-to-cloud
   namespace: azure-iot-operations
 spec:
   operations:
@@ -189,7 +293,7 @@ spec:
       sourceSettings:
         endpointRef: aio-broker
         dataSources:
-          - ai/results
+          - ai/results/fused/+
     - operationType: filter
       filterSettings:
         expression: "$payload.is_anomaly == true"
@@ -199,13 +303,13 @@ spec:
         dataDestination: process-anomalies
 ```
 
-### Route Critical Alerts to Azure Data Explorer for Analysis
+### Route Per-Channel Alerts for Diagnostics
 
 ```yaml
 apiVersion: connectivity.iotoperations.azure.com/v1
 kind: Dataflow
 metadata:
-  name: critical-to-adx
+  name: channel-alerts-to-adx
   namespace: azure-iot-operations
 spec:
   operations:
@@ -213,22 +317,35 @@ spec:
       sourceSettings:
         endpointRef: aio-broker
         dataSources:
-          - ai/results
+          - ai/results/+/+
     - operationType: filter
       filterSettings:
         expression: "$payload.anomaly_score > 0.85"
     - operationType: destination
       destinationSettings:
         endpointRef: adx-endpoint
-        dataDestination: CriticalAnomalies
+        dataDestination: ChannelAnomalies
 ```
 
-### Trigger Azure Logic App for Operator Notification
+### End-to-End Alert Flow
 
-Combine the Event Hubs destination with an Azure Logic App that sends:
-- Email / SMS alerts to operators
-- Microsoft Teams channel notifications
-- ServiceNow incident creation
+```
+Sensor → MQTT → Inference Server → MOMENT (per-channel)
+                                      ↓
+                               SensorFusionEngine
+                                      ↓
+                              MQTT (fused topic)
+                                      ↓
+                              AIO Dataflow (filter)
+                                      ↓
+                         ┌────────────┼────────────┐
+                         ▼            ▼            ▼
+                   Event Hubs    ADX (KQL)    Logic App
+                   (stream)      (analysis)   (notify)
+                                                 ↓
+                                        Teams / Email / SMS
+                                        ServiceNow incident
+```
 
 ---
 
@@ -243,3 +360,22 @@ Using the [SECOM dataset](../../datasets/README.md) as a reference:
 
 This enables **early scrap detection** — diverting defective lots before
 further (wasted) processing steps.
+
+---
+
+## Quick Start: Run the Demo
+
+To see multi-sensor fusion in action without any infrastructure:
+
+```bash
+cd samples/03-end-to-end
+pip install momentfm matplotlib numpy
+python process_anomaly_demo.py
+```
+
+Or explore interactively in the Jupyter notebook:
+
+```bash
+cd notebooks
+jupyter notebook 02-anomaly-detection-multisensor.ipynb
+```

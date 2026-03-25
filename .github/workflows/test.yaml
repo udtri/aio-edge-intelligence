@@ -1,0 +1,132 @@
+# =============================================================================
+# Tests & Linting — CI Workflow
+# =============================================================================
+# Runs Python linting, unit/smoke tests, and Kubernetes manifest validation.
+# =============================================================================
+
+name: Tests & Linting
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Python linting with ruff
+  # ---------------------------------------------------------------------------
+  lint:
+    name: Ruff Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: Run ruff check
+        run: ruff check src/
+
+      - name: Run ruff format check
+        run: ruff format --check src/
+
+  # ---------------------------------------------------------------------------
+  # Python tests
+  # ---------------------------------------------------------------------------
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install project dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Run pytest
+        run: pytest --tb=short -q
+
+      - name: Smoke test — sensor profiles generate valid data
+        run: |
+          python -c "
+          import numpy as np
+          import sys
+          sys.path.insert(0, 'src/sensor-simulator')
+          from profiles import get_profile
+
+          for name in ['vibration', 'temperature', 'pressure', 'audio']:
+              profile = get_profile(name)
+              data = profile.generate(512)
+              assert isinstance(data, np.ndarray), f'{name}: expected ndarray'
+              assert data.shape == (512,), f'{name}: unexpected shape {data.shape}'
+              assert np.all(np.isfinite(data)), f'{name}: non-finite values'
+              print(f'  ✓ {name}: shape={data.shape}, mean={data.mean():.4f}, std={data.std():.4f}')
+
+          print('All sensor profiles OK')
+          "
+
+  # ---------------------------------------------------------------------------
+  # Kubernetes manifest validation
+  # ---------------------------------------------------------------------------
+  validate-k8s:
+    name: Validate K8s Manifests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install PyYAML
+        run: pip install pyyaml
+
+      - name: Validate YAML syntax and required fields
+        run: |
+          python -c "
+          import yaml
+          import pathlib
+          import sys
+
+          manifests_dir = pathlib.Path('deploy/standalone/k8s')
+          errors = []
+
+          for f in sorted(manifests_dir.glob('*.yaml')):
+              try:
+                  docs = list(yaml.safe_load_all(f.read_text()))
+                  for doc in docs:
+                      if doc is None:
+                          continue
+                      if 'apiVersion' not in doc or 'kind' not in doc:
+                          errors.append(f'{f.name}: missing apiVersion or kind')
+                      if 'metadata' not in doc:
+                          errors.append(f'{f.name}: missing metadata')
+                  print(f'  ✓ {f.name}: {len([d for d in docs if d])} resource(s)')
+              except yaml.YAMLError as e:
+                  errors.append(f'{f.name}: {e}')
+
+          if errors:
+              print('\nErrors found:')
+              for err in errors:
+                  print(f'  ✗ {err}')
+              sys.exit(1)
+
+          print('All Kubernetes manifests valid')
+          "

@@ -24,6 +24,10 @@ class AnomalyResult(BaseModel):
     anomaly_scores: list[float]
     threshold: float
     is_anomaly: bool
+    severity: str = Field(
+        default="normal",
+        description="Severity level: normal, warning, or critical",
+    )
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 
