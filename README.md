@@ -69,7 +69,7 @@ All models are swappable at runtime through the **ModelProvider** interface — 
 
 ```bash
 # Clone and run with docker-compose
-git clone https://github.com/YOUR_ORG/aio-sensor-intelligence.git
+git clone https://github.com/udtri/aio-edge-intelligence.git
 cd aio-sensor-intelligence
 docker compose -f deploy/standalone/docker-compose.yaml up
 ```

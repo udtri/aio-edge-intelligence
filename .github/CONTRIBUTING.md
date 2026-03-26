@@ -29,7 +29,7 @@ Thank you for your interest in contributing! This guide will help you get starte
 
 ```bash
 # Clone the repository
-git clone https://github.com/<org>/aio-sensor-intelligence.git
+git clone https://github.com/udtri/aio-edge-intelligence.git
 cd aio-sensor-intelligence
 
 # Create a virtual environment

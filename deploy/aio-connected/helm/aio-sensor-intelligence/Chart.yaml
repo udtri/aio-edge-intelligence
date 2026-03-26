@@ -16,6 +16,6 @@ keywords:
   - anomaly-detection
   - edge-ai
   - moment
-home: https://github.com/Azure-Samples/aio-sensor-intelligence
+home: https://github.com/udtri/aio-edge-intelligence
 maintainers:
   - name: Azure IoT Operations

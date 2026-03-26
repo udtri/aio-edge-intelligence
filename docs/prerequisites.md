@@ -37,7 +37,7 @@ get started.
 
 3. **Clone the repo and start services**:
    ```bash
-   git clone https://github.com/<org>/aio-sensor-intelligence.git
+   git clone https://github.com/udtri/aio-edge-intelligence.git
    cd aio-sensor-intelligence
    docker compose up -d
    ```
