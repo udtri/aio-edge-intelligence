@@ -1,7 +1,7 @@
 [project]
 name = "aio-sensor-intelligence"
 version = "0.1.0"
-description = "Physical AI at the Edge — Deploy time-series foundation models on Kubernetes with Azure IoT Operations"
+description = "Experimental — Deploy time-series foundation models on Kubernetes for edge AI inference. Demo and learning purposes only."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"

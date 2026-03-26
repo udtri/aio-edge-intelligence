@@ -1,4 +1,6 @@
-"""FastAPI inference server for the AIO Sensor Intelligence project.
+"""FastAPI inference server for edge AI sensor intelligence.
+
+Provides REST endpoints for time-series inference tasks.
 
 Exposes REST endpoints for anomaly detection, time-series forecasting, and
 sensor-data classification backed by a pluggable model-provider system.
@@ -72,7 +74,7 @@ async def _lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="AIO Sensor Intelligence — Inference Server",
+    title="Edge AI Sensor Intelligence — Inference Server",
     version="0.1.0",
     lifespan=_lifespan,
 )

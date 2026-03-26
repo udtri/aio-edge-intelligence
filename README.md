@@ -1,9 +1,14 @@
-# aio-sensor-intelligence
+# aio-edge-intelligence
 
-**Physical AI at the Edge with Azure IoT Operations**
+**Deploy Time-Series Foundation Models at the Industrial Edge**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
+
+> [!IMPORTANT]
+> This is a **personal, experimental project** for learning and demonstration purposes.
+> It is **not** an official Microsoft repository, product, or service.
+> Not affiliated with, endorsed by, or supported by Microsoft Corporation.
 
 Deploy open-source time-series foundation models — **MOMENT**, **MOIRAI**, and **Chronos** — on any Kubernetes cluster for predictive maintenance, anomaly detection, and time-series forecasting on factory sensor data. Optionally integrate with **Azure IoT Operations (AIO)** for production-grade OPC UA ingestion and dataflows.
 
@@ -158,3 +163,13 @@ Contributions are welcome! Please open an issue or submit a pull request. See [C
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
+
+---
+
+## Disclaimer
+
+This project is provided "as-is" for educational and experimental purposes. It is a personal project and is not an official Microsoft product, service, or recommendation. The authors make no warranties regarding the suitability of this code for production use.
+
+## Trademark Notice
+
+This project may contain trademarks or logos for projects, products, or services. Authorized use of Microsoft trademarks or logos is subject to and must follow [Microsoft's Trademark & Brand Guidelines](https://www.microsoft.com/legal/intellectualproperty/trademarks/usage/general). Use of Microsoft trademarks or logos in modified versions of this project must not cause confusion or imply Microsoft sponsorship. Any use of third-party trademarks or logos are subject to those third-party's policies.
