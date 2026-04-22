@@ -17,8 +17,8 @@ from datetime import datetime
 
 import numpy as np
 
-from ..model_providers.base import TASK_CLASSIFY, ModelProvider, ModelResult
-from ..schemas import ClassificationResult
+from model_providers.base import TASK_CLASSIFY, ModelProvider, ModelResult
+from schemas import ClassificationResult
 
 logger = logging.getLogger(__name__)
 

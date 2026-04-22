@@ -75,6 +75,7 @@ class MQTTPublisher:
         host: str,
         port: int = 1883,
         use_tls: bool = False,
+        sat_token_path: str = "",
         keepalive: int = 60,
     ) -> None:
         """Connect to the MQTT broker with retry logic.
@@ -83,14 +84,29 @@ class MQTTPublisher:
             host: Broker hostname or IP.
             port: Broker port (default 1883, or 8883 for TLS).
             use_tls: Enable TLS with default system CA bundle.
+            sat_token_path: Path to projected SAT token for AIO broker auth.
             keepalive: MQTT keepalive interval in seconds.
         """
         self._host = host
         self._port = port
 
         if use_tls:
-            self._client.tls_set(cert_reqs=ssl.CERT_REQUIRED)
+            import ssl as _ssl
+            tls_context = _ssl.create_default_context()
+            tls_context.check_hostname = False
+            tls_context.verify_mode = _ssl.CERT_NONE
+            self._client.tls_set_context(tls_context)
             logger.info("TLS enabled for MQTT connection")
+
+        # AIO broker SAT authentication
+        if sat_token_path:
+            try:
+                with open(sat_token_path, "r") as f:
+                    sat_token = f.read().strip()
+                self._client.username_pw_set("K8S-SAT", sat_token)
+                logger.info("SAT auth enabled from %s", sat_token_path)
+            except Exception:
+                logger.exception("Failed to read SAT token from %s", sat_token_path)
 
         self._client.reconnect_delay_set(min_delay=1, max_delay=30)
 

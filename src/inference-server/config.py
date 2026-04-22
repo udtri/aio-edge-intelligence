@@ -76,6 +76,11 @@ class AppConfig(BaseSettings):
         default=False,
         validation_alias="MQTT_USE_TLS",
     )
+    mqtt_sat_token_path: str = Field(
+        default="",
+        validation_alias="MQTT_SAT_TOKEN_PATH",
+        description="Path to projected SAT token for AIO broker auth",
+    )
     mqtt_topics_subscribe: list[str] = Field(default=["sensors/#"])
     mqtt_topic_results: str = Field(default="ai/results")
 

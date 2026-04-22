@@ -1,0 +1,59 @@
+# =============================================================================
+# Custom Values — time-series-ml cluster (Arc-enabled K3s + AIO)
+# =============================================================================
+# Overrides for deploying to the time-series-ml Arc cluster with AIO broker
+# using SAT authentication and ACR image pull secrets.
+# =============================================================================
+
+inferenceServer:
+  image:
+    repository: aioedgeintel.azurecr.io/inference-server
+    tag: "0.1.8"
+    pullPolicy: Always
+  replicas: 1
+  resources:
+    requests:
+      cpu: 500m
+      memory: 2Gi
+    limits:
+      cpu: "2"
+      memory: 4Gi
+      gpu: ""
+  probes:
+    readiness:
+      initialDelaySeconds: 120
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 12
+    liveness:
+      initialDelaySeconds: 180
+      periodSeconds: 30
+      timeoutSeconds: 10
+      failureThreshold: 5
+
+sensorSimulator:
+  enabled: true
+  image:
+    repository: aioedgeintel.azurecr.io/sensor-simulator
+    tag: "0.1.3"
+    pullPolicy: Always
+  publishInterval: "1.0"
+
+mqtt:
+  broker:
+    host: "aio-broker"
+    port: 18883
+  useTLS: true
+  satAuth:
+    enabled: true
+    audience: "aio-internal"
+
+model:
+  provider: "moment"
+  name: "AutonLab/MOMENT-1-large"
+  device: "cpu"
+  windowSize: "512"
+  defaultTask: "anomaly_detection"
+
+imagePullSecrets:
+  - name: acr-secret

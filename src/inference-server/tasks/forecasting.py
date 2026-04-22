@@ -12,8 +12,8 @@ from datetime import datetime
 
 import numpy as np
 
-from ..model_providers.base import TASK_FORECAST, ModelProvider, ModelResult
-from ..schemas import ForecastResult
+from model_providers.base import TASK_FORECAST, ModelProvider, ModelResult
+from schemas import ForecastResult
 
 logger = logging.getLogger(__name__)
 

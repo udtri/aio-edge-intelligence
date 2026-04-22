@@ -31,6 +31,9 @@ data:
   MQTT_BROKER_HOST: {{ .Values.mqtt.broker.host | quote }}
   MQTT_BROKER_PORT: {{ .Values.mqtt.broker.port | quote }}
   MQTT_USE_TLS: {{ .Values.mqtt.useTLS | quote }}
+  {{- if .Values.mqtt.satAuth.enabled }}
+  MQTT_SAT_TOKEN_PATH: "/var/run/secrets/tokens/broker-sat.token"
+  {{- end }}
 
   # ---------------------------------------------------------------------------
   # Sensor Topics

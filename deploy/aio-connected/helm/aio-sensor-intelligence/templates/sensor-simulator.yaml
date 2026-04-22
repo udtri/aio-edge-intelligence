@@ -63,6 +63,12 @@ spec:
           env:
             - name: PUBLISH_INTERVAL
               value: {{ .Values.sensorSimulator.publishInterval | quote }}
+          {{- if .Values.mqtt.satAuth.enabled }}
+          volumeMounts:
+            - name: sat-token
+              mountPath: /var/run/secrets/tokens
+              readOnly: true
+          {{- end }}
           # -------------------------------------------------------------------
           # Resource limits — simulator is lightweight
           # -------------------------------------------------------------------
@@ -74,6 +80,17 @@ spec:
               cpu: {{ .Values.sensorSimulator.resources.limits.cpu }}
               memory: {{ .Values.sensorSimulator.resources.limits.memory }}
       terminationGracePeriodSeconds: 5
+      {{- if .Values.mqtt.satAuth.enabled }}
+      serviceAccountName: {{ include "aio-sensor-intelligence.fullname" . }}
+      volumes:
+        - name: sat-token
+          projected:
+            sources:
+              - serviceAccountToken:
+                  path: broker-sat.token
+                  audience: {{ .Values.mqtt.satAuth.audience }}
+                  expirationSeconds: 86400
+      {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

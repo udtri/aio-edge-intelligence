@@ -59,9 +59,13 @@ class MomentProvider(ModelProvider):
         self,
         model_name: str = "AutonLab/MOMENT-1-large",
         device: str = "auto",
+        default_task: str = TASK_ANOMALY,
+        forecast_horizon: int = 96,
     ) -> None:
         self.model_name = model_name
         self.device = self._resolve_device(device)
+        self._default_task = default_task
+        self._forecast_horizon = forecast_horizon
         # Keyed by MOMENT task name so we can cache pipelines per-task.
         self._pipelines: dict[str, Any] = {}
         self._current_task: str | None = None
@@ -71,13 +75,13 @@ class MomentProvider(ModelProvider):
     # ------------------------------------------------------------------
 
     def load(self) -> None:
-        """Pre-load the default (forecasting) pipeline."""
+        """Pre-load the default pipeline."""
         if MOMENTPipeline is None:
             raise ImportError(
                 "momentfm is not installed. "
                 "Install with: pip install momentfm"
             )
-        self._get_pipeline(TASK_FORECAST)
+        self._get_pipeline(self._default_task)
         logger.info("MomentProvider loaded (%s) on %s", self.model_name, self.device)
 
     def predict(self, data: np.ndarray, task: str, **kwargs: Any) -> ModelResult:
@@ -99,16 +103,51 @@ class MomentProvider(ModelProvider):
         pipeline = self._get_pipeline(task)
         tensor = torch.tensor(data, dtype=torch.float32).to(self.device)
 
-        with torch.no_grad():
-            output = pipeline(tensor, **kwargs)
+        # MOMENT forward() uses keyword-only args: (*, x_enc, input_mask, mask)
+        batch_size, _n_channels, seq_len = tensor.shape
+        input_mask = torch.ones(batch_size, seq_len, device=self.device)
 
-        # MOMENT outputs vary by task; normalise to numpy.
-        if hasattr(output, "output"):
-            result_np = output.output.cpu().numpy()
-        elif isinstance(output, torch.Tensor):
-            result_np = output.cpu().numpy()
-        else:
-            result_np = np.asarray(output)
+        moment_task = _MOMENT_TASK_MAP[task]
+
+        with torch.no_grad():
+            # The pretrained model's task_name may differ from what we want,
+            # so call the specific task method directly.
+            if moment_task == "reconstruction":
+                output = pipeline.reconstruction(
+                    x_enc=tensor, input_mask=input_mask, **kwargs
+                )
+                result_np = output.reconstruction.cpu().numpy()
+            elif moment_task == "forecasting":
+                # Ensure task_name is set so forward routing works
+                pipeline.task_name = "forecasting"
+                output = pipeline(x_enc=tensor, input_mask=input_mask, **kwargs)
+                # Forecast output stored in .forecast; shape [B, C, seq_len]
+                result_np = output.forecast.cpu().numpy()
+            elif moment_task == "classification":
+                output = pipeline.classify(
+                    x_enc=tensor, input_mask=input_mask, **kwargs
+                )
+                result_np = output.logits.cpu().numpy()
+            elif moment_task == "imputation":
+                # Imputation needs a mask indicating missing values
+                mask = kwargs.pop("mask", None)
+                if mask is not None:
+                    mask = torch.tensor(mask, dtype=torch.float32).to(self.device)
+                output = pipeline.reconstruction(
+                    x_enc=tensor, input_mask=input_mask, mask=mask, **kwargs
+                )
+                result_np = output.reconstruction.cpu().numpy()
+            else:
+                # Fallback: call via forward()
+                output = pipeline(x_enc=tensor, input_mask=input_mask, **kwargs)
+                # Try common output attributes
+                for attr in ("reconstruction", "forecast", "logits", "embeddings"):
+                    val = getattr(output, attr, None)
+                    if val is not None:
+                        result_np = val.cpu().numpy()
+                        break
+                else:
+                    result_np = np.asarray(output)
 
         return ModelResult(
             values=result_np,
@@ -132,26 +171,39 @@ class MomentProvider(ModelProvider):
     # ------------------------------------------------------------------
 
     def _get_pipeline(self, task: str) -> Any:
-        """Return (and cache) a MOMENTPipeline for *task*."""
+        """Return (and cache) a MOMENTPipeline for *task*.
+
+        Note: MOMENT-1-large from HuggingFace always loads with task_name
+        ``'reconstruction'`` and a ``PretrainHead``.  All tasks share the
+        same encoder; the task-specific routing happens inside the named
+        methods (``reconstruction()``, ``forecast()``, etc.).  We therefore
+        cache a **single** pipeline and set ``task_name`` dynamically in
+        :meth:`predict`.
+        """
         moment_task = _MOMENT_TASK_MAP.get(task)
         if moment_task is None:
             raise ValueError(
                 f"Unsupported task '{task}'. Choose from {list(_MOMENT_TASK_MAP)}"
             )
 
-        if moment_task not in self._pipelines:
-            logger.info("Building MOMENT pipeline for task '%s' …", moment_task)
+        # Single shared pipeline — all tasks use the same pretrained weights.
+        if "shared" not in self._pipelines:
+            logger.info("Building MOMENT pipeline …")
+            model_kwargs: dict[str, Any] = {
+                "task_name": "reconstruction",
+                "forecast_horizon": self._forecast_horizon,
+            }
             pipeline = MOMENTPipeline.from_pretrained(
                 self.model_name,
-                model_kwargs={"task_name": moment_task},
+                model_kwargs=model_kwargs,
             )
             pipeline.init()
             if self.device != "cpu":
                 pipeline = pipeline.to(self.device)
-            self._pipelines[moment_task] = pipeline
+            self._pipelines["shared"] = pipeline
 
         self._current_task = moment_task
-        return self._pipelines[moment_task]
+        return self._pipelines["shared"]
 
     @staticmethod
     def _resolve_device(device: str) -> str:

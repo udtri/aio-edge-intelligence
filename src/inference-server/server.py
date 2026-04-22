@@ -24,6 +24,7 @@ from schemas import (
     ModelInfo,
     SensorData,
 )
+from tasks import AnomalyDetector, Forecaster
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
@@ -35,7 +36,9 @@ logging.basicConfig(
 # Global state populated during startup
 # ---------------------------------------------------------------------------
 _config: AppConfig | None = None
-_provider: Any = None  # model_providers.BaseProvider instance
+_provider: Any = None  # model_providers.ModelProvider instance
+_anomaly_detector: AnomalyDetector | None = None
+_forecaster: Forecaster | None = None
 _ready: bool = False
 
 
@@ -45,7 +48,7 @@ _ready: bool = False
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
     """Load configuration and initialise the model provider on startup."""
-    global _config, _provider, _ready  # noqa: PLW0603
+    global _config, _provider, _anomaly_detector, _forecaster, _ready  # noqa: PLW0603
 
     _config = AppConfig()
     logger.info(
@@ -58,7 +61,20 @@ async def _lifespan(app: FastAPI):
     try:
         from model_providers import get_provider
 
-        _provider = get_provider(_config)
+        _provider = get_provider(
+            _config.model_provider,
+            model_name=_config.model_name,
+            device=_config.model_device,
+        )
+        _provider.load()
+        _anomaly_detector = AnomalyDetector(
+            provider=_provider,
+            window_size=_config.window_size,
+        )
+        _forecaster = Forecaster(
+            provider=_provider,
+            window_size=_config.window_size,
+        )
         _ready = True
         logger.info("Model provider '%s' is ready", _config.model_provider)
     except Exception:
@@ -113,9 +129,7 @@ async def models() -> ModelInfo:
     return ModelInfo(
         provider=_config.model_provider,
         model_name=_config.model_name,
-        supported_tasks=getattr(
-            _provider, "supported_tasks", ["anomaly_detection", "forecasting", "classification"]
-        ),
+        supported_tasks=_provider.supported_tasks() if _provider else ["anomaly_detection", "forecasting", "classification"],
         device=_config.model_device,
         status="ready" if _ready else "not_ready",
     )
@@ -126,7 +140,11 @@ async def infer_anomaly(data: SensorData) -> AnomalyResult:
     """Run anomaly detection on the supplied sensor data."""
     _require_provider()
     try:
-        result: AnomalyResult = _provider.detect_anomalies(data)
+        import numpy as np
+        values = np.array(data.values, dtype=np.float64)
+        result: AnomalyResult = _anomaly_detector.detect(
+            values, sensor_id=data.sensor_id
+        )
         return result
     except Exception as exc:
         logger.exception("Anomaly detection failed")
@@ -145,9 +163,12 @@ async def infer_forecast(request: ForecastRequest) -> ForecastResult:
     """Produce a time-series forecast from the supplied sensor data."""
     _require_provider()
     try:
-        result: ForecastResult = _provider.forecast(
-            request.data,
+        import numpy as np
+        values = np.array(request.data.values, dtype=np.float64)
+        result: ForecastResult = _forecaster.forecast(
+            values,
             horizon=request.forecast_horizon,
+            sensor_id=request.data.sensor_id,
         )
         return result
     except Exception as exc:

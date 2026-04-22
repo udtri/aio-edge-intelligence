@@ -46,6 +46,7 @@ logger = logging.getLogger("simulator")
 MQTT_BROKER_HOST: str = os.environ.get("MQTT_BROKER_HOST", "localhost")
 MQTT_BROKER_PORT: int = int(os.environ.get("MQTT_BROKER_PORT", "1883"))
 MQTT_USE_TLS: bool = os.environ.get("MQTT_USE_TLS", "false").lower() == "true"
+MQTT_SAT_TOKEN_PATH: str = os.environ.get("MQTT_SAT_TOKEN_PATH", "")
 SENSOR_INTERVAL_MS: int = int(os.environ.get("SENSOR_INTERVAL_MS", "100"))
 ANOMALY_PROBABILITY: float = float(os.environ.get("ANOMALY_PROBABILITY", "0.05"))
 SENSOR_INSTANCES: list[str] = os.environ.get(
@@ -122,7 +123,7 @@ def main() -> None:
     # --- MQTT connection ----------------------------------------------------
     publisher = MQTTPublisher(client_id=f"sensor-sim-{uuid.uuid4().hex[:8]}")
     try:
-        publisher.connect(MQTT_BROKER_HOST, MQTT_BROKER_PORT, use_tls=MQTT_USE_TLS)
+        publisher.connect(MQTT_BROKER_HOST, MQTT_BROKER_PORT, use_tls=MQTT_USE_TLS, sat_token_path=MQTT_SAT_TOKEN_PATH)
     except ConnectionError:
         logger.error("Could not connect to MQTT broker — exiting")
         sys.exit(1)

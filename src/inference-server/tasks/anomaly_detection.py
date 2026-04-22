@@ -15,8 +15,8 @@ from enum import Enum
 
 import numpy as np
 
-from ..model_providers.base import TASK_ANOMALY, ModelProvider, ModelResult
-from ..schemas import AnomalyResult
+from model_providers.base import TASK_ANOMALY, ModelProvider, ModelResult
+from schemas import AnomalyResult
 
 logger = logging.getLogger(__name__)
 

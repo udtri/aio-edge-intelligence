@@ -49,7 +49,7 @@ class MQTTBridge:
     # ------------------------------------------------------------------
 
     def connect(self) -> None:
-        """Connect to the MQTT broker, optionally with TLS for AIO."""
+        """Connect to the MQTT broker, optionally with TLS and SAT auth for AIO."""
         if self._config.mqtt_use_tls:
             tls_context = ssl.create_default_context()
             # AIO deployments typically inject certs via volume mounts.
@@ -57,6 +57,16 @@ class MQTTBridge:
             tls_context.verify_mode = ssl.CERT_NONE
             self._client.tls_set_context(tls_context)
             logger.info("TLS enabled for MQTT connection")
+
+        # AIO broker SAT authentication
+        if self._config.mqtt_sat_token_path:
+            try:
+                with open(self._config.mqtt_sat_token_path, "r") as f:
+                    sat_token = f.read().strip()
+                self._client.username_pw_set("K8S-SAT", sat_token)
+                logger.info("SAT auth enabled from %s", self._config.mqtt_sat_token_path)
+            except Exception:
+                logger.exception("Failed to read SAT token from %s", self._config.mqtt_sat_token_path)
 
         logger.info(
             "Connecting to MQTT broker at %s:%d",

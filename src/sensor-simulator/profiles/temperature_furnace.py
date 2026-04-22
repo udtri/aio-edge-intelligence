@@ -171,16 +171,21 @@ class TemperatureFurnaceProfile:
 
         elif anomaly == AnomalyType.THERMAL_SHOCK:
             # Sudden large drop then partial recovery
-            shock_idx = self._rng.integers(n // 4, 3 * n // 4)
-            drop_magnitude = self._rng.uniform(150, 300)
-            recovery_samples = int(2.0 * self.sampling_rate)
-            for i in range(min(recovery_samples, n - shock_idx)):
-                frac = i / recovery_samples
-                temps[shock_idx + i] -= drop_magnitude * (1 - frac)
-            logger.debug(
-                "Thermal shock at sample %d, drop %.0f °C",
-                shock_idx,
-                drop_magnitude,
-            )
+            if n <= 1:
+                temps[0] -= self._rng.uniform(150, 300)
+            else:
+                lo = max(1, n // 4)
+                hi = max(lo + 1, 3 * n // 4)
+                shock_idx = self._rng.integers(lo, hi)
+                drop_magnitude = self._rng.uniform(150, 300)
+                recovery_samples = int(2.0 * self.sampling_rate)
+                for i in range(min(recovery_samples, n - shock_idx)):
+                    frac = i / recovery_samples
+                    temps[shock_idx + i] -= drop_magnitude * (1 - frac)
+                logger.debug(
+                    "Thermal shock at sample %d, drop %.0f °C",
+                    shock_idx,
+                    drop_magnitude,
+                )
 
         return temps

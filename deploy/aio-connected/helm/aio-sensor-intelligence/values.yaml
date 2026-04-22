@@ -91,6 +91,11 @@ mqtt:
   # Enable TLS for the MQTT connection (recommended for AIO broker)
   useTLS: true
 
+  # Service Account Token (SAT) authentication for AIO broker
+  satAuth:
+    enabled: false
+    audience: "aio-internal"
+
   # MQTT topics for sensor data ingestion
   topics:
     sensors:
