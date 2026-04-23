@@ -416,11 +416,11 @@ The same pattern is playing out for time series:
 
 ```
 2018-2022: Every sensor anomaly problem → custom feature engineering + custom model
-2023-2025: Foundation models (MOMENT, TimesFM, Chronos) → pretrained baseline for any time series
+2023-2025: Foundation models (MOMENT, TimesFM) → pretrained baseline for any time series
 2025+:     Fine-tuned foundation models → surpass custom models with less effort
 ```
 
-Models like MOMENT, Archetype AI's Newton, and Salesforce's MOIRAI are
+Models like MOMENT and Archetype AI's Newton are
 **generalizing** what it means to understand temporal patterns — across domains,
 across sensor types, across industries. The model that learned from electrical grid
 data can detect anomalies in HVAC systems because the underlying temporal patterns
