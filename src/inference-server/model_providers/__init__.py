@@ -39,23 +39,7 @@ except ImportError:
         "Install with: pip install momentfm"
     )
 
-try:
-    from .moirai_provider import MoiraiProvider
-except ImportError:
-    MoiraiProvider = None  # type: ignore[assignment,misc]
-    logger.warning(
-        "uni2ts is not installed — MoiraiProvider unavailable. "
-        "Install with: pip install uni2ts"
-    )
 
-try:
-    from .chronos_provider import ChronosProvider
-except ImportError:
-    ChronosProvider = None  # type: ignore[assignment,misc]
-    logger.warning(
-        "chronos-forecasting is not installed — ChronosProvider unavailable. "
-        "Install with: pip install chronos-forecasting"
-    )
 
 # ---------------------------------------------------------------------------
 # Provider registry
@@ -66,10 +50,6 @@ _REGISTRY: dict[str, type[ModelProvider]] = {
 
 if MomentProvider is not None:
     _REGISTRY["moment"] = MomentProvider
-if MoiraiProvider is not None:
-    _REGISTRY["moirai"] = MoiraiProvider
-if ChronosProvider is not None:
-    _REGISTRY["chronos"] = ChronosProvider
 
 
 def get_provider(name: str, **kwargs: Any) -> ModelProvider:
@@ -78,8 +58,7 @@ def get_provider(name: str, **kwargs: Any) -> ModelProvider:
     Parameters
     ----------
     name : str
-        Key in the provider registry (``"moment"``, ``"moirai"``,
-        ``"chronos"``, or ``"custom"``).
+        Key in the provider registry (``"moment"`` or ``"custom"``).
     **kwargs
         Forwarded to the provider constructor (e.g. ``model_name``,
         ``device``).
@@ -113,7 +92,5 @@ __all__ = [
     "ALL_TASKS",
     # Concrete providers
     "MomentProvider",
-    "MoiraiProvider",
-    "ChronosProvider",
     "CustomProvider",
 ]

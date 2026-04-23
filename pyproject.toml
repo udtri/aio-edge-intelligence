@@ -22,19 +22,13 @@ dev = [
     "httpx>=0.27.0",
     "ruff>=0.8.0",
 ]
-moirai = [
-    "uni2ts",
-]
-chronos = [
-    "chronos-forecasting",
-]
 notebooks = [
     "jupyter>=1.0.0",
     "matplotlib>=3.9.0",
     "pandas>=2.2.0",
 ]
 all = [
-    "aio-sensor-intelligence[dev,moirai,chronos,notebooks]",
+    "aio-sensor-intelligence[dev,notebooks]",
 ]
 
 [build-system]

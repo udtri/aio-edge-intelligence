@@ -59,8 +59,6 @@ aio-sensor-intelligence/
 │   │   ├── model_providers/    # Pluggable AI model backends
 │   │   │   ├── base.py         # ModelProvider ABC + shared types
 │   │   │   ├── moment_provider.py
-│   │   │   ├── chronos_provider.py
-│   │   │   ├── moirai_provider.py
 │   │   │   └── custom_provider.py
 │   │   ├── tasks/              # AI task implementations
 │   │   ├── server.py           # FastAPI application entrypoint

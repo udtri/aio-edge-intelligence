@@ -91,7 +91,7 @@ Currently implemented:
 |---|---|---|
 | `MomentProvider` | MOMENT-1-large | Default; runs on CPU or GPU |
 
-Adding a new model (e.g., TimesFM, Chronos) requires only a new
+Adding a new model (e.g., TimesFM) requires only a new
 `ModelProvider` subclass — zero changes to the rest of the system.
 
 ---

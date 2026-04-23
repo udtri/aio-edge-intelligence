@@ -6,8 +6,8 @@ After deploying and testing the MOMENT time-series foundation model on an Azure 
 Operations cluster, a natural question emerges: **why not just use scikit-learn?**
 
 Random forests, XGBoost, logistic regression, ARIMA — these are proven, well-understood,
-and fast. They work. So what do encoder-based foundation models like MOMENT (or
-Archetype AI's Newton) actually change?
+and fast. They work. So what do encoder-based foundation models like MOMENT
+actually change?
 
 This document captures the honest answer, grounded in what we observed during live
 deployment and testing on a 3-node Arc-enabled K3s cluster.
@@ -420,7 +420,7 @@ The same pattern is playing out for time series:
 2025+:     Fine-tuned foundation models → surpass custom models with less effort
 ```
 
-Models like MOMENT and Archetype AI's Newton are
+Models like MOMENT are
 **generalizing** what it means to understand temporal patterns — across domains,
 across sensor types, across industries. The model that learned from electrical grid
 data can detect anomalies in HVAC systems because the underlying temporal patterns

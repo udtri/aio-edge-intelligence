@@ -10,7 +10,7 @@
 > It is **not** an official Microsoft repository, product, or service.
 > Not affiliated with, endorsed by, or supported by Microsoft Corporation.
 
-Deploy open-source time-series foundation models — **MOMENT**, **MOIRAI**, and **Chronos** — on any Kubernetes cluster for predictive maintenance, anomaly detection, and time-series forecasting on factory sensor data. Optionally integrate with **Azure IoT Operations (AIO)** for production-grade OPC UA ingestion and dataflows.
+Deploy the open-source **MOMENT** time-series foundation model on any Kubernetes cluster for predictive maintenance, anomaly detection, and time-series forecasting on factory sensor data. Optionally integrate with **Azure IoT Operations (AIO)** for production-grade OPC UA ingestion and dataflows.
 
 ---
 
@@ -60,8 +60,6 @@ Deploy open-source time-series foundation models — **MOMENT**, **MOIRAI**, and
 | Provider | Model | Best For | Config |
 |----------|-------|----------|--------|
 | MOMENT | AutonLab/MOMENT-1-large | Anomaly detection, classification | `MODEL_PROVIDER=moment` |
-| MOIRAI | Salesforce/moirai-1.1-R-large | Universal forecasting | `MODEL_PROVIDER=moirai` |
-| Chronos | amazon/chronos-t5-large | Production forecasting | `MODEL_PROVIDER=chronos` |
 | Custom | Your own model | Any task | `MODEL_PROVIDER=custom` |
 
 All models are swappable at runtime through the **ModelProvider** interface — set `MODEL_PROVIDER` in your environment or Helm values and the inference server loads the corresponding provider. Implementing a custom provider requires a single Python class.
@@ -117,9 +115,7 @@ aio-sensor-intelligence/
 │   │   └── providers/           # Pluggable model providers
 │   │       ├── base.py          # ModelProvider interface
 │   │       ├── moment.py
-│   │       ├── moirai.py
-│   │       ├── chronos.py
-│   │       └── custom.py
+│   │       ├── custom.py
 │   └── simulator/               # Sensor data simulator
 ├── config/                      # Default configuration files
 ├── dashboards/                  # Grafana dashboard definitions
@@ -138,7 +134,7 @@ Key environment variables for the inference server:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `MODEL_PROVIDER` | Model backend (`moment`, `moirai`, `chronos`, `custom`) | `moment` |
+| `MODEL_PROVIDER` | Model backend (`moment`, `custom`) | `moment` |
 | `MQTT_BROKER_HOST` | MQTT broker hostname | `localhost` |
 | `MQTT_BROKER_PORT` | MQTT broker port | `1883` |
 | `SUBSCRIBE_TOPICS` | Comma-separated MQTT topics to subscribe to | `sensors/#` |
