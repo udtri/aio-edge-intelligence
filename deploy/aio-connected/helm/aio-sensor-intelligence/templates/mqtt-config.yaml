@@ -21,7 +21,7 @@ data:
   # ---------------------------------------------------------------------------
   MODEL_PROVIDER: {{ .Values.model.provider | quote }}
   MODEL_NAME: {{ .Values.model.name | quote }}
-  DEVICE: {{ .Values.model.device | quote }}
+  MODEL_DEVICE: {{ .Values.model.device | quote }}
   WINDOW_SIZE: {{ .Values.model.windowSize | quote }}
   DEFAULT_TASK: {{ .Values.model.defaultTask | quote }}
 

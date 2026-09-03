@@ -50,17 +50,17 @@ class AppConfig(BaseSettings):
     model_provider: str = Field(
         default="moment",
         validation_alias="MODEL_PROVIDER",
-        description="Model provider backend to use (e.g. moment)",
+        description="Model provider backend to use (moment, timesfm, or custom)",
     )
     model_name: str = Field(
-        default="AutonLab/MOMENT-1-large",
+        default="",
         validation_alias="MODEL_NAME",
-        description="HuggingFace model identifier or local path",
+        description="HuggingFace model identifier or local path; blank uses the provider default",
     )
     model_device: str = Field(
         default="auto",
         validation_alias="MODEL_DEVICE",
-        description="Device for inference: auto, cuda, or cpu",
+        description="Device for inference: auto, cpu, cuda, or mps",
     )
 
     # ── MQTT settings ────────────────────────────────────────────────

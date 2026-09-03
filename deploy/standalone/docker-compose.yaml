@@ -38,7 +38,7 @@ services:
   # ---------------------------------------------------------------------------
   # Inference Server — Time-Series AI Model Host
   # ---------------------------------------------------------------------------
-  # Runs the MOMENT (or other) time-series foundation model. Subscribes to
+  # Runs the configured time-series foundation model. Subscribes to
   # sensor data topics and publishes AI results (anomalies, forecasts, etc.).
   inference-server:
     build:
@@ -53,11 +53,11 @@ services:
       - MQTT_BROKER_HOST=mosquitto
       - MQTT_BROKER_PORT=1883
       # Model configuration
-      - MODEL_PROVIDER=moment
-      - MODEL_NAME=AutonLab/MOMENT-1-large
-      - DEVICE=cpu
-      - WINDOW_SIZE=512
-      - DEFAULT_TASK=anomaly_detection
+      - MODEL_PROVIDER=${MODEL_PROVIDER:-moment}
+      - MODEL_NAME=${MODEL_NAME:-}
+      - MODEL_DEVICE=${MODEL_DEVICE:-cpu}
+      - WINDOW_SIZE=${WINDOW_SIZE:-512}
+      - DEFAULT_TASK=${DEFAULT_TASK:-anomaly_detection}
     ports:
       - "8080:8080"
     restart: unless-stopped

@@ -25,12 +25,12 @@ except ImportError:  # pragma: no cover
 
 from .base import (
     ALL_TASKS,
-    ModelProvider,
-    ModelResult,
     TASK_ANOMALY,
     TASK_CLASSIFY,
     TASK_FORECAST,
     TASK_IMPUTATION,
+    ModelProvider,
+    ModelResult,
 )
 
 logger = logging.getLogger(__name__)

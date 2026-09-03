@@ -72,17 +72,20 @@ In **standalone mode** the project deploys a Mosquitto container.  In
 **AIO-connected mode** the AIO MQTT broker is used directly — no extra
 broker is needed.
 
-### Model Provider Abstraction (`src/inference/models/`)
+### Model Provider Abstraction (`src/inference-server/model_providers/`)
 
 All model interactions go through an abstract `ModelProvider` interface:
 
 ```python
 class ModelProvider(ABC):
     @abstractmethod
-    def detect_anomalies(self, window: np.ndarray) -> AnomalyResult: ...
+    def load(self) -> None: ...
 
     @abstractmethod
-    def forecast(self, window: np.ndarray, horizon: int) -> ForecastResult: ...
+    def predict(self, data: np.ndarray, task: str, **kwargs) -> ModelResult: ...
+
+    @abstractmethod
+    def supported_tasks(self) -> list[str]: ...
 ```
 
 Currently implemented:
@@ -90,9 +93,10 @@ Currently implemented:
 | Provider | Model | Notes |
 |---|---|---|
 | `MomentProvider` | MOMENT-1-large | Default; runs on CPU or GPU |
+| `TimesFMProvider` | TimesFM 2.5 or 3.0 | Forecasting; 2.5 is the permissive default |
+| `CustomProvider` | User-supplied | Extension point for another backend |
 
-Adding a new model (e.g., TimesFM) requires only a new
-`ModelProvider` subclass — zero changes to the rest of the system.
+Adding another model requires a `ModelProvider` subclass and one registry entry.
 
 ---
 

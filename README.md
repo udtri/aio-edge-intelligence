@@ -1,6 +1,6 @@
 # aio-edge-intelligence
 
-**Deploy Time-Series Foundation Models at the Industrial Edge**
+**Run time-series foundation models beside the systems producing the data.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
@@ -10,7 +10,7 @@
 > It is **not** an official Microsoft repository, product, or service.
 > Not affiliated with, endorsed by, or supported by Microsoft Corporation.
 
-Deploy the open-source **MOMENT** time-series foundation model on any Kubernetes cluster for predictive maintenance, anomaly detection, and time-series forecasting on factory sensor data. Optionally integrate with **Azure IoT Operations (AIO)** for production-grade OPC UA ingestion and dataflows.
+Deploy **MOMENT** or **Google TimesFM** on any Kubernetes cluster for anomaly detection and forecasting on factory sensor data. The same inference API runs locally, on lightweight edge Kubernetes, or beside **Azure IoT Operations (AIO)** for OPC UA ingestion and dataflows.
 
 ---
 
@@ -60,9 +60,14 @@ Deploy the open-source **MOMENT** time-series foundation model on any Kubernetes
 | Provider | Model | Best For | Config |
 |----------|-------|----------|--------|
 | MOMENT | AutonLab/MOMENT-1-large | Anomaly detection, classification | `MODEL_PROVIDER=moment` |
+| Google TimesFM | google/timesfm-2.5-200m-pytorch | Open-weight univariate forecasting | `MODEL_PROVIDER=timesfm` |
+| Google TimesFM | google/timesfm-3.0-pytorch | Multivariate forecasting with covariates | `MODEL_PROVIDER=timesfm` |
 | Custom | Your own model | Any task | `MODEL_PROVIDER=custom` |
 
 All models are swappable at runtime through the **ModelProvider** interface — set `MODEL_PROVIDER` in your environment or Helm values and the inference server loads the corresponding provider. Implementing a custom provider requires a single Python class.
+
+> [!CAUTION]
+> TimesFM 3.0 model weights currently permit non-commercial, non-production use only. TimesFM 2.5 remains the default Google checkpoint because its weights use Apache-2.0. See the [TimesFM provider guide](docs/timesfm-provider.md).
 
 ---
 
@@ -73,11 +78,20 @@ All models are swappable at runtime through the **ModelProvider** interface — 
 ```bash
 # Clone and run with docker-compose
 git clone https://github.com/udtri/aio-edge-intelligence.git
-cd aio-sensor-intelligence
+cd aio-edge-intelligence
 docker compose -f deploy/standalone/docker-compose.yaml up
 ```
 
 This starts Mosquitto, the sensor simulator, and the inference server with the default model. Sensor data flows on `sensors/*` topics; results appear on `ai/results`.
+
+To run Google TimesFM 2.5 for forecasting:
+
+```bash
+MODEL_PROVIDER=timesfm \
+MODEL_NAME=google/timesfm-2.5-200m-pytorch \
+DEFAULT_TASK=forecasting \
+docker compose -f deploy/standalone/docker-compose.yaml up --build
+```
 
 ### AIO-Connected Mode (Helm)
 
@@ -101,7 +115,7 @@ The Helm chart deploys the inference server and configures AIO dataflows to subs
 ## Project Structure
 
 ```
-aio-sensor-intelligence/
+aio-edge-intelligence/
 ├── deploy/
 │   ├── standalone/              # Docker Compose & plain K8s manifests
 │   │   └── docker-compose.yaml
@@ -110,18 +124,19 @@ aio-sensor-intelligence/
 │       │   └── aio-sensor-intelligence/
 │       └── dataflows/
 ├── src/
-│   ├── inference/               # Inference server
+│   ├── inference-server/        # FastAPI inference service
 │   │   ├── server.py
-│   │   └── providers/           # Pluggable model providers
-│   │       ├── base.py          # ModelProvider interface
-│   │       ├── moment.py
-│   │       ├── custom.py
-│   └── simulator/               # Sensor data simulator
-├── config/                      # Default configuration files
-├── dashboards/                  # Grafana dashboard definitions
+│   │   └── model_providers/     # Pluggable model providers
+│   │       ├── base.py
+│   │       ├── moment_provider.py
+│   │       ├── timesfm_provider.py
+│   │       └── custom_provider.py
+│   ├── sensor-simulator/        # MQTT sensor simulator
+│   └── dashboard/               # Grafana definitions
+├── docs/
+├── samples/
 ├── tests/
-├── Dockerfile
-├── requirements.txt
+├── pyproject.toml
 ├── LICENSE
 └── README.md
 ```
@@ -134,7 +149,9 @@ Key environment variables for the inference server:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `MODEL_PROVIDER` | Model backend (`moment`, `custom`) | `moment` |
+| `MODEL_PROVIDER` | Model backend (`moment`, `timesfm`, `custom`) | `moment` |
+| `MODEL_NAME` | Hugging Face checkpoint or local model path | Provider default |
+| `MODEL_DEVICE` | Inference device (`auto`, `cpu`, `cuda`, `mps`) | `auto` |
 | `MQTT_BROKER_HOST` | MQTT broker hostname | `localhost` |
 | `MQTT_BROKER_PORT` | MQTT broker port | `1883` |
 | `SUBSCRIBE_TOPICS` | Comma-separated MQTT topics to subscribe to | `sensors/#` |
@@ -151,7 +168,8 @@ Contributions are welcome! Please open an issue or submit a pull request. See [C
 ## Roadmap
 
 - **VLA / VLM Vision Integration** — Extend the ModelProvider interface to support Vision-Language-Action and Vision-Language models for visual inspection and robotic control at the edge.
-- **Additional model providers** — TimesFM, PatchTST, and more.
+- **Probabilistic forecast API** — Return TimesFM quantiles through the HTTP contract.
+- **Covariate-aware requests** — Expose TimesFM 3 multivariate inputs through the HTTP API.
 - **Edge-optimized inference** — ONNX Runtime and quantized model support for constrained hardware.
 
 ---

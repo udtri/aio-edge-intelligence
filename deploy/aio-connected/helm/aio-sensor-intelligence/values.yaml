@@ -111,10 +111,10 @@ mqtt:
 # Model Configuration
 # ---------------------------------------------------------------------------
 model:
-  # Model provider framework ("moment" for MOMENT foundation model)
+  # Model provider framework: "moment", "timesfm", or "custom"
   provider: "moment"
-  # Hugging Face model identifier or local model path
-  name: "AutonLab/MOMENT-1-large"
+  # Hugging Face model identifier or local model path; blank uses the provider default
+  name: ""
   # Compute device: "auto" (detect GPU/CPU), "cpu", or "cuda"
   device: "auto"
   # Number of data points in each inference window

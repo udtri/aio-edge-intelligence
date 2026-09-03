@@ -12,10 +12,10 @@ import logging
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
-
 from config import AppConfig
+from fastapi import FastAPI, HTTPException
+from model_providers.base import TASK_ANOMALY, TASK_CLASSIFY, TASK_FORECAST
+from pydantic import BaseModel, Field
 from schemas import (
     AnomalyResult,
     ClassificationResult,
@@ -48,35 +48,50 @@ _ready: bool = False
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
     """Load configuration and initialise the model provider on startup."""
-    global _config, _provider, _anomaly_detector, _forecaster, _ready  # noqa: PLW0603
+    global _config, _provider, _anomaly_detector, _forecaster, _ready
 
     _config = AppConfig()
     logger.info(
         "Configuration loaded — provider=%s  model=%s  device=%s",
         _config.model_provider,
-        _config.model_name,
+        _config.model_name or "provider default",
         _config.model_device,
     )
 
     try:
         from model_providers import get_provider
 
-        _provider = get_provider(
-            _config.model_provider,
-            model_name=_config.model_name,
-            device=_config.model_device,
-        )
+        provider_options: dict[str, Any] = {"device": _config.model_device}
+        if _config.model_name:
+            provider_options["model_name"] = _config.model_name
+        _provider = get_provider(_config.model_provider, **provider_options)
         _provider.load()
-        _anomaly_detector = AnomalyDetector(
-            provider=_provider,
-            window_size=_config.window_size,
+        _config.model_name = _provider.info().get(
+            "model_name", _config.model_name or "provider default"
         )
-        _forecaster = Forecaster(
-            provider=_provider,
-            window_size=_config.window_size,
+        supported_tasks = _provider.supported_tasks()
+        _anomaly_detector = (
+            AnomalyDetector(
+                provider=_provider,
+                window_size=_config.window_size,
+            )
+            if TASK_ANOMALY in supported_tasks
+            else None
+        )
+        _forecaster = (
+            Forecaster(
+                provider=_provider,
+                window_size=_config.window_size,
+            )
+            if TASK_FORECAST in supported_tasks
+            else None
         )
         _ready = True
-        logger.info("Model provider '%s' is ready", _config.model_provider)
+        logger.info(
+            "Model provider '%s' is ready for: %s",
+            _config.model_provider,
+            ", ".join(supported_tasks),
+        )
     except Exception:
         logger.exception("Failed to initialise model provider")
         _ready = False
@@ -99,12 +114,26 @@ app = FastAPI(
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-def _require_provider():
+def _require_provider() -> None:
     """Raise 503 if the model provider is not available."""
     if not _ready or _provider is None:
         raise HTTPException(
             status_code=503,
             detail="Model provider is not loaded or not ready",
+        )
+
+
+def _require_task(task: str) -> None:
+    """Raise 422 when the active model does not implement an endpoint task."""
+    _require_provider()
+    if task not in _provider.supported_tasks():
+        provider_name = _config.model_provider if _config else "unknown"
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Provider '{provider_name}' does not support '{task}'. "
+                f"Supported tasks: {_provider.supported_tasks()}"
+            ),
         )
 
 
@@ -138,7 +167,7 @@ async def models() -> ModelInfo:
 @app.post("/infer/anomaly", response_model=AnomalyResult)
 async def infer_anomaly(data: SensorData) -> AnomalyResult:
     """Run anomaly detection on the supplied sensor data."""
-    _require_provider()
+    _require_task(TASK_ANOMALY)
     try:
         import numpy as np
         values = np.array(data.values, dtype=np.float64)
@@ -161,7 +190,7 @@ class ForecastRequest(BaseModel):
 @app.post("/infer/forecast", response_model=ForecastResult)
 async def infer_forecast(request: ForecastRequest) -> ForecastResult:
     """Produce a time-series forecast from the supplied sensor data."""
-    _require_provider()
+    _require_task(TASK_FORECAST)
     try:
         import numpy as np
         values = np.array(request.data.values, dtype=np.float64)
@@ -179,7 +208,7 @@ async def infer_forecast(request: ForecastRequest) -> ForecastResult:
 @app.post("/infer/classify", response_model=ClassificationResult)
 async def infer_classify(data: SensorData) -> ClassificationResult:
     """Classify the supplied sensor data."""
-    _require_provider()
+    _require_task(TASK_CLASSIFY)
     try:
         result: ClassificationResult = _provider.classify(data)
         return result

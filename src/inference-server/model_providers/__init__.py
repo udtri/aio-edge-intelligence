@@ -4,7 +4,7 @@ Usage::
 
     from model_providers import get_provider
 
-    provider = get_provider("moment", device="cuda")
+    provider = get_provider("timesfm", device="cuda")
     provider.load()
     result = provider.predict(data, task="forecasting")
 """
@@ -16,12 +16,12 @@ from typing import Any
 
 from .base import (
     ALL_TASKS,
-    ModelProvider,
-    ModelResult,
     TASK_ANOMALY,
     TASK_CLASSIFY,
     TASK_FORECAST,
     TASK_IMPUTATION,
+    ModelProvider,
+    ModelResult,
 )
 from .custom_provider import CustomProvider
 
@@ -51,6 +51,18 @@ _REGISTRY: dict[str, type[ModelProvider]] = {
 if MomentProvider is not None:
     _REGISTRY["moment"] = MomentProvider
 
+try:
+    from .timesfm_provider import TimesFMProvider
+except ImportError:
+    TimesFMProvider = None  # type: ignore[assignment,misc]
+    logger.warning(
+        "timesfm is not installed — TimesFMProvider unavailable. "
+        "Install with: pip install 'timesfm[torch]>=3.0.1,<4'"
+    )
+
+if TimesFMProvider is not None:
+    _REGISTRY["timesfm"] = TimesFMProvider
+
 
 def get_provider(name: str, **kwargs: Any) -> ModelProvider:
     """Instantiate a model provider by its registered name.
@@ -58,7 +70,8 @@ def get_provider(name: str, **kwargs: Any) -> ModelProvider:
     Parameters
     ----------
     name : str
-        Key in the provider registry (``"moment"`` or ``"custom"``).
+        Key in the provider registry (``"moment"``, ``"timesfm"``, or
+        ``"custom"``).
     **kwargs
         Forwarded to the provider constructor (e.g. ``model_name``,
         ``device``).
@@ -79,18 +92,19 @@ def get_provider(name: str, **kwargs: Any) -> ModelProvider:
 
 
 __all__ = [
-    # Factory
-    "get_provider",
+    "ALL_TASKS",
+    # Task constants
+    "TASK_ANOMALY",
+    "TASK_CLASSIFY",
+    "TASK_FORECAST",
+    "TASK_IMPUTATION",
+    "CustomProvider",
     # Base types
     "ModelProvider",
     "ModelResult",
-    # Task constants
-    "TASK_ANOMALY",
-    "TASK_FORECAST",
-    "TASK_CLASSIFY",
-    "TASK_IMPUTATION",
-    "ALL_TASKS",
     # Concrete providers
     "MomentProvider",
-    "CustomProvider",
+    "TimesFMProvider",
+    # Factory
+    "get_provider",
 ]

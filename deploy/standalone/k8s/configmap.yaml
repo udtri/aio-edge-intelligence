@@ -20,12 +20,12 @@ data:
   # ---------------------------------------------------------------------------
   # Model Configuration
   # ---------------------------------------------------------------------------
-  # The model provider framework (e.g., "moment" for MOMENT foundation model)
+  # The model provider framework: moment, timesfm, or custom
   MODEL_PROVIDER: "moment"
-  # Hugging Face model identifier or local path
-  MODEL_NAME: "AutonLab/MOMENT-1-large"
+  # Hugging Face model identifier or local path; blank uses the provider default
+  MODEL_NAME: ""
   # Compute device: "auto" (detect GPU/CPU), "cpu", or "cuda"
-  DEVICE: "auto"
+  MODEL_DEVICE: "auto"
   # Number of time-series data points per inference window
   WINDOW_SIZE: "512"
   # Default AI task: anomaly_detection, forecasting, classification, or imputation
